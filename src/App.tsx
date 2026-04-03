@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { AppShell } from './app/AppShell'
 import { DashboardScreen } from './features/dashboard/DashboardScreen'
 import { ExercisesScreen } from './features/exercises/ExercisesScreen'
@@ -33,18 +34,28 @@ import './index.css'
 
 type TabId = 'dashboard' | 'workout' | 'templates' | 'exercises' | 'history' | 'settings'
 
-const tabs: Array<{ id: TabId; label: string }> = [
-  { id: 'dashboard', label: 'Home' },
-  { id: 'workout', label: 'Log' },
-  { id: 'templates', label: 'Plans' },
-  { id: 'history', label: 'PRs' },
+const tabs: Array<{ id: TabId; label: string; path: string }> = [
+  { id: 'dashboard', label: 'Home', path: '/' },
+  { id: 'workout', label: 'Log', path: '/workout' },
+  { id: 'templates', label: 'Plans', path: '/templates' },
+  { id: 'history', label: 'PRs', path: '/history' },
+]
+
+const routeToTab: Array<{ path: string; id: TabId }> = [
+  { path: '/workout', id: 'workout' },
+  { path: '/templates', id: 'templates' },
+  { path: '/history', id: 'history' },
+  { path: '/exercises', id: 'exercises' },
+  { path: '/settings', id: 'settings' },
+  { path: '/', id: 'dashboard' },
 ]
 
 function App() {
-  const [activeTab, setActiveTab] = useState<TabId>('dashboard')
   const [isMoreOpen, setIsMoreOpen] = useState(false)
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const location = useLocation()
+  const navigate = useNavigate()
 
   const exercises = useLiveQuery(() => listAllExercises(), [refreshKey], [])
   const templates = useLiveQuery(() => listTemplates(), [refreshKey], [])
@@ -64,6 +75,14 @@ function App() {
     return () => window.clearInterval(interval)
   }, [])
 
+  const activeTab = useMemo<TabId>(() => {
+    const match = routeToTab.find(({ path }) =>
+      path === '/' ? location.pathname === '/' : location.pathname.startsWith(path),
+    )
+
+    return match?.id ?? 'dashboard'
+  }, [location.pathname])
+
   const status = useMemo(() => {
     if (activeWorkout) {
       return 'Workout live'
@@ -73,7 +92,7 @@ function App() {
       return `${pendingSyncCount} pending`
     }
 
-    return 'Offline-first'
+    return null
   }, [activeWorkout, pendingSyncCount])
 
   async function refresh() {
@@ -98,7 +117,7 @@ function App() {
             preferences={preferences}
             onStartTemplate={async (templateId) => {
               await startWorkoutFromTemplate(templateId)
-              setActiveTab('workout')
+              navigate('/workout')
               await refresh()
             }}
           />
@@ -136,7 +155,7 @@ function App() {
             }}
             onCompleteWorkout={async (workoutId) => {
               await completeWorkout(workoutId)
-              setActiveTab('history')
+              navigate('/history')
               await refresh()
             }}
             onCancelRestTimer={async () => {
@@ -157,7 +176,7 @@ function App() {
             }}
             onStartTemplate={async (templateId) => {
               await startWorkoutFromTemplate(templateId)
-              setActiveTab('workout')
+              navigate('/workout')
               await refresh()
             }}
           />
@@ -199,10 +218,9 @@ function App() {
 
   return (
     <AppShell
-      title={activeTab === 'dashboard' ? 'Train harder, log faster.' : tabs.find((tab) => tab.id === activeTab)?.label ?? 'Stronk'}
-      subtitle="Offline-first workout tracking for simple progressive overload."
+      title={activeTab === 'dashboard' ? 'Home' : routeToTab.find((route) => route.id === activeTab)?.id === 'settings' ? 'Settings' : tabs.find((tab) => tab.id === activeTab)?.label ?? (activeTab === 'exercises' ? 'Exercises' : 'Stronk')}
       status={status}
-      onStatusClick={activeWorkout ? () => setActiveTab('workout') : undefined}
+      onStatusClick={activeWorkout ? () => navigate('/workout') : undefined}
       footer={
         <>
           {tabs.map((tab) => (
@@ -210,7 +228,7 @@ function App() {
               key={tab.id}
               className={activeTab === tab.id ? 'nav-button active' : 'nav-button'}
               onClick={() => {
-                setActiveTab(tab.id)
+                navigate(tab.path)
                 setIsMoreOpen(false)
               }}
             >
@@ -237,7 +255,7 @@ function App() {
           <button
             className={activeTab === 'exercises' ? 'ghost-button active-sheet' : 'ghost-button'}
             onClick={() => {
-              setActiveTab('exercises')
+              navigate('/exercises')
               setIsMoreOpen(false)
             }}
           >
@@ -246,7 +264,7 @@ function App() {
           <button
             className={activeTab === 'settings' ? 'ghost-button active-sheet' : 'ghost-button'}
             onClick={() => {
-              setActiveTab('settings')
+              navigate('/settings')
               setIsMoreOpen(false)
             }}
           >

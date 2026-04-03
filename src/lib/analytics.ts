@@ -1,3 +1,4 @@
+import { getExerciseTrackingMode } from './format'
 import type { ExerciseAnalytics, Exercise, LoggedSet, Workout, WorkoutExercise } from './types'
 
 interface AnalyticsInput {
@@ -45,9 +46,13 @@ export function buildExerciseAnalytics({
       {
         exerciseId: exercise.id,
         exerciseName: exercise.name,
+        trackingMode: getExerciseTrackingMode(exercise),
         latestWeight: null,
         latestReps: null,
+        latestAssistanceWeight: null,
         personalBestWeight: null,
+        personalBestReps: null,
+        leastAssistanceWeight: null,
         personalBestVolume: null,
         totalSessions: 0,
         points: [],
@@ -55,23 +60,41 @@ export function buildExerciseAnalytics({
 
     const point = analytics.points.find((entry) => entry.workoutDate === workout.startedAt)
     const weight = set.weight ?? 0
+    const assistanceWeight = set.assistanceWeight ?? 0
     const reps = set.reps ?? 0
     const volume = weight * reps
+    const metricValue =
+      analytics.trackingMode === 'bodyweight_reps'
+        ? reps
+        : analytics.trackingMode === 'assisted_bodyweight_reps'
+          ? assistanceWeight
+          : weight
 
     if (point) {
-      point.maxWeight = Math.max(point.maxWeight, weight)
+      point.metricValue =
+        analytics.trackingMode === 'assisted_bodyweight_reps'
+          ? Math.min(point.metricValue, metricValue)
+          : Math.max(point.metricValue, metricValue)
       point.totalVolume += volume
     } else {
       analytics.points.push({
         workoutDate: workout.startedAt,
-        maxWeight: weight,
+        metricValue,
         totalVolume: volume,
       })
     }
 
     analytics.latestWeight = weight || analytics.latestWeight
     analytics.latestReps = reps || analytics.latestReps
+    analytics.latestAssistanceWeight = assistanceWeight || analytics.latestAssistanceWeight
     analytics.personalBestWeight = Math.max(analytics.personalBestWeight ?? 0, weight) || null
+    analytics.personalBestReps = Math.max(analytics.personalBestReps ?? 0, reps) || null
+    analytics.leastAssistanceWeight =
+      analytics.leastAssistanceWeight == null
+        ? (assistanceWeight || null)
+        : assistanceWeight > 0
+          ? Math.min(analytics.leastAssistanceWeight, assistanceWeight)
+          : analytics.leastAssistanceWeight
     analytics.personalBestVolume =
       Math.max(analytics.personalBestVolume ?? 0, volume) || null
 

@@ -10,8 +10,10 @@
 ## V1 Scope
 
 - Exercise library with seeded defaults and custom exercises.
+- Hierarchical muscle targeting metadata on exercises (`Body Region > Muscle Group`) for future training suggestions.
+- Exercise-specific tracking modes for standard load, bodyweight-only, and assisted bodyweight movements.
 - Workout templates with ordered exercises and planned sets.
-- Active workout logging with reps, weight, and completion state.
+- Active workout logging with reps, load/assistance fields as appropriate, and completion state.
 - Rest timer tied to set completion.
 - Workout history and basic progression analytics.
 - PWA installability and offline app shell caching.
@@ -33,15 +35,29 @@
 
 ## Domain Model
 
-- `exercise`
+- `exercise` with `bodyRegion`, `muscleGroup`, and `trackingMode`
 - `workoutTemplate`
 - `templateExercise`
-- `templateSet`
+- `templateSet` with mode-specific target fields
 - `workout`
 - `workoutExercise`
-- `loggedSet`
+- `loggedSet` with canonical stored load plus assistance where relevant
 - `preferences`
 - `syncQueueItem`
+
+## Tracking Rules
+
+- Supported v1 exercise tracking modes are `weight_reps`, `bodyweight_reps`, and `assisted_bodyweight_reps`.
+- Weight-like values are stored in a canonical internal unit and converted only at input/output boundaries.
+- `bodyweight_reps` exercises track reps without a required load field.
+- `assisted_bodyweight_reps` exercises track assistance separately; do not model assistance as negative load.
+- Analytics are mode-specific: load PRs for standard lifts, reps PRs for bodyweight movements, and least-assistance progression for assisted movements.
+
+## Exercise Taxonomy
+
+- Exercises use a two-level muscle taxonomy, not a flat body-part string.
+- `bodyRegion` is the broad grouping (for example `Arms`), and `muscleGroup` is the more specific target (for example `Triceps`).
+- Seeded and custom exercises should use the structured taxonomy so future recommendation logic can reason over training distribution.
 
 ## Sync Policy
 

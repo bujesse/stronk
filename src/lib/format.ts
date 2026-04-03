@@ -1,4 +1,5 @@
-import type { WeightUnit } from './types'
+import type { ExerciseAnalytics, Exercise, TrackingMode, WeightUnit } from './types'
+export { formatExerciseMuscleLabel } from './muscles'
 
 const KG_PER_LB = 0.45359237
 
@@ -34,6 +35,40 @@ export function formatWeight(weight: number | null, unit: WeightUnit) {
     ? displayWeight.toFixed(0)
     : displayWeight.toFixed(1)
   return `${rounded} ${unit}`
+}
+
+export function getTrackingModeLabel(mode: TrackingMode) {
+  switch (mode) {
+    case 'weight_reps':
+      return 'Load + reps'
+    case 'bodyweight_reps':
+      return 'Reps only'
+    case 'assisted_bodyweight_reps':
+      return 'Assisted reps'
+  }
+}
+
+export function getExerciseTrackingMode(exercise: Pick<Exercise, 'trackingMode' | 'equipment'>) {
+  if (exercise.trackingMode) {
+    return exercise.trackingMode
+  }
+
+  return exercise.equipment === 'Bodyweight' ? 'bodyweight_reps' : 'weight_reps'
+}
+
+export function formatExerciseBest(analytics: ExerciseAnalytics, unit: WeightUnit) {
+  switch (analytics.trackingMode) {
+    case 'weight_reps':
+      return analytics.personalBestWeight != null
+        ? `${formatWeight(analytics.personalBestWeight, unit)} best load`
+        : '--'
+    case 'bodyweight_reps':
+      return analytics.personalBestReps != null ? `${analytics.personalBestReps} reps best set` : '--'
+    case 'assisted_bodyweight_reps':
+      return analytics.leastAssistanceWeight != null
+        ? `${formatWeight(analytics.leastAssistanceWeight, unit)} least assist`
+        : '--'
+  }
 }
 
 export function parseOptionalNumber(value: string) {

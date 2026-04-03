@@ -1,6 +1,6 @@
 import { SectionCard } from '../../components/SectionCard'
 import { formatShortDate, minutesBetween } from '../../lib/time'
-import { formatWeight, pluralize } from '../../lib/format'
+import { formatExerciseBest, pluralize } from '../../lib/format'
 import type { ExerciseAnalytics, Preferences, TemplateWithDetails, WorkoutWithDetails } from '../../lib/types'
 
 interface DashboardScreenProps {
@@ -86,8 +86,8 @@ export function DashboardScreen({
               <p>{pluralize(entry.totalSessions, 'session')}</p>
             </div>
             <div className="right-align">
-              <strong>{formatWeight(entry.personalBestWeight, preferences?.weightUnit ?? 'lb')}</strong>
-              <p>best load</p>
+              <strong>{formatExerciseBest(entry, preferences?.weightUnit ?? 'lb')}</strong>
+              <p>best marker</p>
             </div>
           </div>
         ))}

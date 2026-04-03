@@ -1,6 +1,6 @@
 import { SectionCard } from '../../components/SectionCard'
 import { formatShortDate, minutesBetween } from '../../lib/time'
-import { formatWeight } from '../../lib/format'
+import { formatExerciseBest } from '../../lib/format'
 import type { ExerciseAnalytics, Preferences, WorkoutWithDetails } from '../../lib/types'
 
 interface HistoryScreenProps {
@@ -63,11 +63,11 @@ export function HistoryScreen({
                   <p>{entry.totalSessions} logged sessions</p>
                 </div>
                 <div className="right-align">
-                  <strong>{formatWeight(entry.personalBestWeight, preferences?.weightUnit ?? 'lb')}</strong>
-                  <p>best load</p>
+                  <strong>{formatExerciseBest(entry, preferences?.weightUnit ?? 'lb')}</strong>
+                  <p>best marker</p>
                 </div>
               </div>
-              <Sparkline values={entry.points.map((point) => point.maxWeight)} />
+              <Sparkline values={entry.points.map((point) => point.metricValue)} />
             </article>
           ))}
           {analytics.length === 0 ? <p className="empty-state">Complete a workout to unlock analytics.</p> : null}

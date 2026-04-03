@@ -2,8 +2,7 @@ import type { ReactNode } from 'react'
 
 interface AppShellProps {
   title: string
-  subtitle: string
-  status: string
+  status: string | null
   onStatusClick?: () => void
   children: ReactNode
   footer: ReactNode
@@ -11,7 +10,6 @@ interface AppShellProps {
 
 export function AppShell({
   title,
-  subtitle,
   status,
   onStatusClick,
   children,
@@ -20,14 +18,12 @@ export function AppShell({
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div>
-          <p className="eyebrow">Stronk</p>
-          <h1>{title}</h1>
-          <p className="subtitle">{subtitle}</p>
-        </div>
-        <button className="status-pill" onClick={onStatusClick} disabled={!onStatusClick}>
-          {status}
-        </button>
+        <h1>{title}</h1>
+        {status ? (
+          <button className="status-pill" onClick={onStatusClick} disabled={!onStatusClick}>
+            {status}
+          </button>
+        ) : null}
       </header>
       <main className="content">{children}</main>
       <footer className="bottom-nav">{footer}</footer>

@@ -1,12 +1,26 @@
 export type SyncStatus = 'synced' | 'pending' | 'error'
 
 export type WeightUnit = 'lb' | 'kg'
+export type BodyRegion =
+  | 'Chest'
+  | 'Back'
+  | 'Shoulders'
+  | 'Arms'
+  | 'Legs'
+  | 'Core'
+  | 'Cardio'
+export type TrackingMode =
+  | 'weight_reps'
+  | 'bodyweight_reps'
+  | 'assisted_bodyweight_reps'
 
 export interface Exercise {
   id: string
   name: string
+  bodyRegion: BodyRegion | null
   muscleGroup: string | null
   equipment: string | null
+  trackingMode: TrackingMode
   defaultRestSeconds: number | null
   isCustom: boolean
   deletedAt: string | null
@@ -42,6 +56,7 @@ export interface TemplateSet {
   sortOrder: number
   targetReps: number | null
   targetWeight: number | null
+  targetAssistanceWeight: number | null
   deletedAt: string | null
   createdAt: string
   updatedAt: string
@@ -79,6 +94,7 @@ export interface LoggedSet {
   sortOrder: number
   reps: number | null
   weight: number | null
+  assistanceWeight: number | null
   completedAt: string | null
   deletedAt: string | null
   createdAt: string
@@ -109,6 +125,7 @@ export interface SyncQueueItem {
 export interface TemplateSetDraft {
   reps: string
   weight: string
+  assistanceWeight: string
 }
 
 export interface TemplateExerciseWithSets {
@@ -136,14 +153,18 @@ export interface WorkoutWithDetails {
 export interface ExerciseAnalytics {
   exerciseId: string
   exerciseName: string
+  trackingMode: TrackingMode
   latestWeight: number | null
   latestReps: number | null
+  latestAssistanceWeight: number | null
   personalBestWeight: number | null
+  personalBestReps: number | null
+  leastAssistanceWeight: number | null
   personalBestVolume: number | null
   totalSessions: number
   points: Array<{
     workoutDate: string
-    maxWeight: number
+    metricValue: number
     totalVolume: number
   }>
 }

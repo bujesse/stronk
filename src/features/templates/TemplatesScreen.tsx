@@ -1,7 +1,13 @@
 import { useMemo, useState } from 'react'
+import { DropdownField } from '../../components/DropdownField'
 import { SectionCard } from '../../components/SectionCard'
-import { pluralize } from '../../lib/format'
-import type { Exercise, TemplateSetDraft, TemplateWithDetails, WeightUnit } from '../../lib/types'
+import { getExerciseTrackingMode, pluralize } from '../../lib/format'
+import type {
+  Exercise,
+  TemplateSetDraft,
+  TemplateWithDetails,
+  WeightUnit,
+} from '../../lib/types'
 
 interface TemplatesScreenProps {
   exercises: Exercise[]
@@ -16,7 +22,7 @@ interface TemplatesScreenProps {
   onStartTemplate: (templateId: string) => void
 }
 
-const emptySet = () => ({ reps: '', weight: '' })
+const emptySet = (): TemplateSetDraft => ({ reps: '', weight: '', assistanceWeight: '' })
 
 export function TemplatesScreen({
   exercises,
@@ -43,7 +49,12 @@ export function TemplatesScreen({
     }))
   }
 
-  function updateDraft(exerciseId: string, index: number, field: 'reps' | 'weight', value: string) {
+  function updateDraft(
+    exerciseId: string,
+    index: number,
+    field: keyof TemplateSetDraft,
+    value: string,
+  ) {
     setSetDrafts((current) => ({
       ...current,
       [exerciseId]: (current[exerciseId] ?? []).map((entry, entryIndex) =>
@@ -82,18 +93,23 @@ export function TemplatesScreen({
       <SectionCard title="Build template" description="Assemble the session you repeat most often.">
         <div className="form-grid">
           <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Push day" />
-          <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Optional notes" rows={3} />
+          <textarea
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder="Optional notes"
+            rows={3}
+          />
           {availableExercises.length > 0 ? (
-            <select defaultValue="" onChange={(event) => event.target.value && addExercise(event.target.value)}>
-              <option value="" disabled>
-                Add exercise
-              </option>
-              {availableExercises.map((exercise) => (
-                <option key={exercise.id} value={exercise.id}>
-                  {exercise.name}
-                </option>
-              ))}
-            </select>
+            <DropdownField
+              label="Add exercise"
+              value=""
+              placeholder="Add exercise"
+              options={availableExercises.map((exercise) => ({
+                value: exercise.id,
+                label: exercise.name,
+              }))}
+              onChange={addExercise}
+            />
           ) : null}
         </div>
 
@@ -103,6 +119,8 @@ export function TemplatesScreen({
             if (!exercise) {
               return null
             }
+
+            const trackingMode = getExerciseTrackingMode(exercise)
 
             return (
               <div className="embedded-card" key={exerciseId}>
@@ -122,12 +140,24 @@ export function TemplatesScreen({
                         placeholder="Reps"
                         inputMode="numeric"
                       />
-                      <input
-                        value={draft.weight}
-                        onChange={(event) => updateDraft(exerciseId, index, 'weight', event.target.value)}
-                        placeholder={`Weight (${weightUnit})`}
-                        inputMode="decimal"
-                      />
+                      {trackingMode === 'weight_reps' ? (
+                        <input
+                          value={draft.weight}
+                          onChange={(event) => updateDraft(exerciseId, index, 'weight', event.target.value)}
+                          placeholder={`Weight (${weightUnit})`}
+                          inputMode="decimal"
+                        />
+                      ) : null}
+                      {trackingMode === 'assisted_bodyweight_reps' ? (
+                        <input
+                          value={draft.assistanceWeight}
+                          onChange={(event) =>
+                            updateDraft(exerciseId, index, 'assistanceWeight', event.target.value)
+                          }
+                          placeholder={`Assist (${weightUnit})`}
+                          inputMode="decimal"
+                        />
+                      ) : null}
                     </div>
                   ))}
                 </div>

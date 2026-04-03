@@ -1,3 +1,4 @@
+import { DropdownField } from '../../components/DropdownField'
 import { SectionCard } from '../../components/SectionCard'
 
 interface SettingsScreenProps {
@@ -23,13 +24,16 @@ export function SettingsScreen({
     <div className="stack">
       <SectionCard title="Preferences" description="Local settings sync once cloud backup is configured.">
         <div className="form-grid">
-          <label className="field-label">
-            Weight unit
-            <select value={weightUnit} onChange={(event) => onWeightUnitChange(event.target.value as 'lb' | 'kg')}>
-              <option value="lb">Pounds</option>
-              <option value="kg">Kilograms</option>
-            </select>
-          </label>
+          <DropdownField
+            label="Weight unit"
+            value={weightUnit}
+            placeholder="Choose unit"
+            options={[
+              { value: 'lb', label: 'Pounds' },
+              { value: 'kg', label: 'Kilograms' },
+            ]}
+            onChange={(value) => onWeightUnitChange(value as 'lb' | 'kg')}
+          />
           <label className="field-label">
             Default rest
             <input

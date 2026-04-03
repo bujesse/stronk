@@ -2,11 +2,13 @@ import { db } from './appDb'
 import { createId } from '../lib/id'
 import { nowIso } from '../lib/time'
 import { buildExerciseAnalytics } from '../lib/analytics'
-import { toStorageWeight } from '../lib/format'
+import { getExerciseTrackingMode, toStorageWeight } from '../lib/format'
 import type {
+  BodyRegion,
   ExerciseAnalytics,
   LoggedSet,
   Preferences,
+  TrackingMode,
   TemplateSetDraft,
   TemplateExercise,
   TemplateSet,
@@ -58,16 +60,20 @@ export async function savePreferences(updates: Partial<Preferences>) {
 
 export async function createExercise(input: {
   name: string
+  bodyRegion?: BodyRegion | null
   muscleGroup?: string
   equipment?: string
+  trackingMode: TrackingMode
   defaultRestSeconds?: number | null
 }) {
   const timestamp = nowIso()
   const exercise = {
     id: createId('exercise'),
     name: input.name.trim(),
+    bodyRegion: input.bodyRegion ?? null,
     muscleGroup: input.muscleGroup?.trim() || null,
     equipment: input.equipment?.trim() || null,
+    trackingMode: input.trackingMode,
     defaultRestSeconds: input.defaultRestSeconds ?? null,
     isCustom: true,
     deletedAt: null,
@@ -115,6 +121,8 @@ export async function createTemplate(input: {
       await queue('workoutTemplate', template.id, 'upsert', template)
 
       for (const [index, exerciseId] of input.exerciseIds.entries()) {
+        const exercise = await db.exercises.get(exerciseId)
+        const trackingMode = exercise ? getExerciseTrackingMode(exercise) : 'weight_reps'
         const templateExercise: TemplateExercise = {
           id: createId('templateExercise'),
           templateId,
@@ -136,7 +144,14 @@ export async function createTemplate(input: {
             templateExerciseId: templateExercise.id,
             sortOrder: setIndex,
             targetReps: draft.reps ? Number(draft.reps) : null,
-            targetWeight: draft.weight ? toStorageWeight(Number(draft.weight), weightUnit) : null,
+            targetWeight:
+              trackingMode === 'weight_reps' && draft.weight
+                ? toStorageWeight(Number(draft.weight), weightUnit)
+                : null,
+            targetAssistanceWeight:
+              trackingMode === 'assisted_bodyweight_reps' && draft.assistanceWeight
+                ? toStorageWeight(Number(draft.assistanceWeight), weightUnit)
+                : null,
             deletedAt: null,
             createdAt: timestamp,
             updatedAt: timestamp,
@@ -240,6 +255,7 @@ export async function startWorkoutFromTemplate(templateId: string) {
             sortOrder: setIndex,
             reps: set.targetReps,
             weight: set.targetWeight,
+            assistanceWeight: set.targetAssistanceWeight,
             completedAt: null,
             deletedAt: null,
             createdAt: timestamp,
@@ -302,6 +318,7 @@ export async function createQuickWorkout(name: string, exerciseIds: string[]) {
             sortOrder: setIndex,
             reps: null,
             weight: null,
+            assistanceWeight: null,
             completedAt: null,
             deletedAt: null,
             createdAt: timestamp,
@@ -373,7 +390,7 @@ export async function listWorkoutHistory(limit = 12): Promise<WorkoutWithDetails
 
 export async function updateLoggedSet(
   loggedSetId: string,
-  updates: Partial<Pick<LoggedSet, 'reps' | 'weight' | 'completedAt'>>,
+  updates: Partial<Pick<LoggedSet, 'reps' | 'weight' | 'assistanceWeight' | 'completedAt'>>,
 ) {
   const current = await db.loggedSets.get(loggedSetId)
   if (!current) {
@@ -386,6 +403,10 @@ export async function updateLoggedSet(
     ...updates,
     weight:
       updates.weight === undefined ? current.weight : toStorageWeight(updates.weight, weightUnit),
+    assistanceWeight:
+      updates.assistanceWeight === undefined
+        ? current.assistanceWeight
+        : toStorageWeight(updates.assistanceWeight, weightUnit),
     updatedAt: nowIso(),
     syncStatus: 'pending',
   }
@@ -418,6 +439,7 @@ export async function addSetToWorkoutExercise(workoutExerciseId: string) {
     sortOrder: sets.length,
     reps: null,
     weight: null,
+    assistanceWeight: null,
     completedAt: null,
     deletedAt: null,
     createdAt: timestamp,
@@ -474,6 +496,7 @@ export async function addExerciseToWorkout(workoutId: string, exerciseId: string
       sortOrder: setIndex,
       reps: null,
       weight: null,
+      assistanceWeight: null,
       completedAt: null,
       deletedAt: null,
       createdAt: timestamp,
