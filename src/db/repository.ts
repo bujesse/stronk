@@ -2,6 +2,7 @@ import { db } from './appDb'
 import { createId } from '../lib/id'
 import { nowIso } from '../lib/time'
 import { buildExerciseAnalytics } from '../lib/analytics'
+import { toStorageWeight } from '../lib/format'
 import type {
   ExerciseAnalytics,
   LoggedSet,
@@ -33,6 +34,11 @@ async function queue(entity: string, entityId: string, operation: 'upsert' | 'de
 
 export async function getPreferences() {
   return db.preferences.get('preferences')
+}
+
+async function getWeightUnit() {
+  const preferences = await getPreferences()
+  return preferences?.weightUnit ?? 'lb'
 }
 
 export async function savePreferences(updates: Partial<Preferences>) {
@@ -89,6 +95,7 @@ export async function createTemplate(input: {
 }) {
   const timestamp = nowIso()
   const templateId = createId('template')
+  const weightUnit = await getWeightUnit()
 
   await db.transaction(
     'rw',
@@ -129,7 +136,7 @@ export async function createTemplate(input: {
             templateExerciseId: templateExercise.id,
             sortOrder: setIndex,
             targetReps: draft.reps ? Number(draft.reps) : null,
-            targetWeight: draft.weight ? Number(draft.weight) : null,
+            targetWeight: draft.weight ? toStorageWeight(Number(draft.weight), weightUnit) : null,
             deletedAt: null,
             createdAt: timestamp,
             updatedAt: timestamp,
@@ -372,10 +379,13 @@ export async function updateLoggedSet(
   if (!current) {
     return
   }
+  const weightUnit = await getWeightUnit()
 
   const next: LoggedSet = {
     ...current,
     ...updates,
+    weight:
+      updates.weight === undefined ? current.weight : toStorageWeight(updates.weight, weightUnit),
     updatedAt: nowIso(),
     syncStatus: 'pending',
   }

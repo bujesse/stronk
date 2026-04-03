@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { SectionCard } from '../../components/SectionCard'
 import { pluralize } from '../../lib/format'
-import type { Exercise, TemplateSetDraft, TemplateWithDetails } from '../../lib/types'
+import type { Exercise, TemplateSetDraft, TemplateWithDetails, WeightUnit } from '../../lib/types'
 
 interface TemplatesScreenProps {
   exercises: Exercise[]
   templates: TemplateWithDetails[]
+  weightUnit: WeightUnit
   onCreateTemplate: (input: {
     name: string
     notes: string
@@ -20,6 +21,7 @@ const emptySet = () => ({ reps: '', weight: '' })
 export function TemplatesScreen({
   exercises,
   templates,
+  weightUnit,
   onCreateTemplate,
   onStartTemplate,
 }: TemplatesScreenProps) {
@@ -123,7 +125,7 @@ export function TemplatesScreen({
                       <input
                         value={draft.weight}
                         onChange={(event) => updateDraft(exerciseId, index, 'weight', event.target.value)}
-                        placeholder="Weight"
+                        placeholder={`Weight (${weightUnit})`}
                         inputMode="decimal"
                       />
                     </div>

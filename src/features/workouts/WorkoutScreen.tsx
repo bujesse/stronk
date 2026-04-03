@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { SectionCard } from '../../components/SectionCard'
+import { fromStorageWeight } from '../../lib/format'
 import { formatDurationFromNow, formatShortDate } from '../../lib/time'
 import type { Exercise, Preferences, WorkoutWithDetails } from '../../lib/types'
 
@@ -186,6 +187,7 @@ export function WorkoutScreen({
               <div className={set.completedAt ? 'set-row done' : 'set-row'} key={set.id}>
                 <span>Set {index + 1}</span>
                 <input
+                  key={`${set.id}-reps-${set.updatedAt}`}
                   defaultValue={set.reps ?? ''}
                   placeholder="Reps"
                   inputMode="numeric"
@@ -196,7 +198,8 @@ export function WorkoutScreen({
                   }
                 />
                 <input
-                  defaultValue={set.weight ?? ''}
+                  key={`${set.id}-weight-${preferences?.weightUnit ?? 'lb'}-${set.updatedAt}`}
+                  defaultValue={fromStorageWeight(set.weight, preferences?.weightUnit ?? 'lb') ?? ''}
                   placeholder={`Weight (${preferences?.weightUnit ?? 'lb'})`}
                   inputMode="decimal"
                   onBlur={(event) =>

@@ -150,6 +150,7 @@ function App() {
           <TemplatesScreen
             exercises={exercises}
             templates={templates}
+            weightUnit={preferences?.weightUnit ?? 'lb'}
             onCreateTemplate={async (input) => {
               await createTemplate(input)
               await refresh()
