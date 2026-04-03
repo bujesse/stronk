@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useState } from 'react'
+import { DropdownField } from '../../components/DropdownField'
 import { SectionCard } from '../../components/SectionCard'
+import { useTicker } from '../../hooks/useTicker'
 import { fromStorageWeight, getExerciseTrackingMode } from '../../lib/format'
 import { formatDurationFromNow, formatShortDate } from '../../lib/time'
 import type { Exercise, Preferences, WorkoutWithDetails } from '../../lib/types'
@@ -41,81 +43,12 @@ export function WorkoutScreen({
   onCompleteWorkout,
   onCancelRestTimer,
 }: WorkoutScreenProps) {
-  const quickSelectFieldRef = useRef<HTMLLabelElement | null>(null)
-  const selectFieldRef = useRef<HTMLLabelElement | null>(null)
+  useTicker(1000, timerEndAt != null)
+
   const [quickName, setQuickName] = useState('')
   const [selectedExerciseIds, setSelectedExerciseIds] = useState<string[]>([])
   const [quickExerciseToAdd, setQuickExerciseToAdd] = useState('')
-  const [isQuickExercisePickerOpen, setIsQuickExercisePickerOpen] = useState(false)
-  const [quickExerciseQuery, setQuickExerciseQuery] = useState('')
   const [exerciseToAdd, setExerciseToAdd] = useState('')
-  const [isExercisePickerOpen, setIsExercisePickerOpen] = useState(false)
-  const [exerciseQuery, setExerciseQuery] = useState('')
-
-  const selectedQuickExerciseName = useMemo(
-    () => exercises.find((exercise) => exercise.id === quickExerciseToAdd)?.name ?? 'Choose exercise',
-    [quickExerciseToAdd, exercises],
-  )
-  const selectedExerciseName = useMemo(
-    () => exercises.find((exercise) => exercise.id === exerciseToAdd)?.name ?? 'Choose exercise',
-    [exerciseToAdd, exercises],
-  )
-  const filteredQuickExercises = useMemo(() => {
-    const query = quickExerciseQuery.trim().toLowerCase()
-    return exercises.filter((exercise) => {
-      if (selectedExerciseIds.includes(exercise.id)) {
-        return false
-      }
-
-      if (!query) {
-        return true
-      }
-
-      return exercise.name.toLowerCase().includes(query)
-    })
-  }, [quickExerciseQuery, exercises, selectedExerciseIds])
-  const filteredExercises = useMemo(() => {
-    const query = exerciseQuery.trim().toLowerCase()
-    if (!query) {
-      return exercises
-    }
-
-    return exercises.filter((exercise) => exercise.name.toLowerCase().includes(query))
-  }, [exerciseQuery, exercises])
-
-  useEffect(() => {
-    if (!isQuickExercisePickerOpen) {
-      return
-    }
-
-    function handlePointerDown(event: PointerEvent) {
-      if (!quickSelectFieldRef.current?.contains(event.target as Node)) {
-        setIsQuickExercisePickerOpen(false)
-      }
-    }
-
-    document.addEventListener('pointerdown', handlePointerDown)
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown)
-    }
-  }, [isQuickExercisePickerOpen])
-
-  useEffect(() => {
-    if (!isExercisePickerOpen) {
-      return
-    }
-
-    function handlePointerDown(event: PointerEvent) {
-      if (!selectFieldRef.current?.contains(event.target as Node)) {
-        setIsExercisePickerOpen(false)
-      }
-    }
-
-    document.addEventListener('pointerdown', handlePointerDown)
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown)
-    }
-  }, [isExercisePickerOpen])
 
   async function startQuickWorkout() {
     if (selectedExerciseIds.length === 0) {
@@ -126,8 +59,6 @@ export function WorkoutScreen({
     setQuickName('')
     setSelectedExerciseIds([])
     setQuickExerciseToAdd('')
-    setQuickExerciseQuery('')
-    setIsQuickExercisePickerOpen(false)
   }
 
   if (!activeWorkout) {
@@ -137,50 +68,20 @@ export function WorkoutScreen({
           <div className="form-grid">
             <input value={quickName} onChange={(event) => setQuickName(event.target.value)} placeholder="Upper body" />
             <div className="inline-actions">
-              <label className="select-field" ref={quickSelectFieldRef}>
-                <span className="select-label">Exercise</span>
-                <button
-                  type="button"
-                  className={isQuickExercisePickerOpen ? 'styled-select trigger-open' : 'styled-select'}
-                  onClick={() => setIsQuickExercisePickerOpen((value) => !value)}
-                >
-                  <span className={quickExerciseToAdd ? 'selected-value' : 'placeholder-value'}>
-                    {selectedQuickExerciseName}
-                  </span>
-                </button>
-                {isQuickExercisePickerOpen ? (
-                  <div className="select-menu">
-                    <input
-                      className="typeahead-input"
-                      value={quickExerciseQuery}
-                      onChange={(event) => setQuickExerciseQuery(event.target.value)}
-                      placeholder="Search exercises"
-                      autoFocus
-                    />
-                    {filteredQuickExercises.map((exercise) => (
-                      <button
-                        key={exercise.id}
-                        type="button"
-                        className={
-                          exercise.id === quickExerciseToAdd
-                            ? 'select-option active-option'
-                            : 'select-option'
-                        }
-                        onClick={() => {
-                          setQuickExerciseToAdd(exercise.id)
-                          setQuickExerciseQuery('')
-                          setIsQuickExercisePickerOpen(false)
-                        }}
-                      >
-                        {exercise.name}
-                      </button>
-                    ))}
-                    {filteredQuickExercises.length === 0 ? (
-                      <div className="select-empty">No exercises match that search.</div>
-                    ) : null}
-                  </div>
-                ) : null}
-              </label>
+              <DropdownField
+                label="Exercise"
+                value={quickExerciseToAdd}
+                placeholder="Choose exercise"
+                searchable
+                emptyMessage="No exercises match that search."
+                options={exercises
+                  .filter((exercise) => !selectedExerciseIds.includes(exercise.id))
+                  .map((exercise) => ({
+                    value: exercise.id,
+                    label: exercise.name,
+                  }))}
+                onChange={setQuickExerciseToAdd}
+              />
               <button
                 className="primary-button"
                 onClick={() => {
@@ -190,8 +91,6 @@ export function WorkoutScreen({
 
                   setSelectedExerciseIds((current) => [...current, quickExerciseToAdd])
                   setQuickExerciseToAdd('')
-                  setQuickExerciseQuery('')
-                  setIsQuickExercisePickerOpen(false)
                 }}
               >
                 Add
@@ -252,48 +151,18 @@ export function WorkoutScreen({
       <div className="floating-select-card">
         <SectionCard title="Add exercise" description="Drop movements into the current session without leaving the workout.">
           <div className="inline-actions">
-            <label className="select-field" ref={selectFieldRef}>
-              <span className="select-label">Exercise</span>
-              <button
-                type="button"
-                className={isExercisePickerOpen ? 'styled-select trigger-open' : 'styled-select'}
-                onClick={() => setIsExercisePickerOpen((value) => !value)}
-              >
-                <span className={exerciseToAdd ? 'selected-value' : 'placeholder-value'}>
-                  {selectedExerciseName}
-                </span>
-              </button>
-              {isExercisePickerOpen ? (
-                <div className="select-menu">
-                  <input
-                    className="typeahead-input"
-                    value={exerciseQuery}
-                    onChange={(event) => setExerciseQuery(event.target.value)}
-                    placeholder="Search exercises"
-                    autoFocus
-                  />
-                  {filteredExercises.map((exercise) => (
-                    <button
-                      key={exercise.id}
-                      type="button"
-                      className={
-                        exercise.id === exerciseToAdd ? 'select-option active-option' : 'select-option'
-                      }
-                      onClick={() => {
-                        setExerciseToAdd(exercise.id)
-                        setExerciseQuery('')
-                        setIsExercisePickerOpen(false)
-                      }}
-                    >
-                      {exercise.name}
-                    </button>
-                  ))}
-                  {filteredExercises.length === 0 ? (
-                    <div className="select-empty">No exercises match that search.</div>
-                  ) : null}
-                </div>
-              ) : null}
-            </label>
+            <DropdownField
+              label="Exercise"
+              value={exerciseToAdd}
+              placeholder="Choose exercise"
+              searchable
+              emptyMessage="No exercises match that search."
+              options={exercises.map((exercise) => ({
+                value: exercise.id,
+                label: exercise.name,
+              }))}
+              onChange={setExerciseToAdd}
+            />
             <button
               className="primary-button"
               onClick={async () => {
@@ -303,8 +172,6 @@ export function WorkoutScreen({
 
                 await onAddExerciseToWorkout(activeWorkout.workout.id, exerciseToAdd)
                 setExerciseToAdd('')
-                setExerciseQuery('')
-                setIsExercisePickerOpen(false)
               }}
             >
               Add

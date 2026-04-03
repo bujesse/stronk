@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AppShell } from './app/AppShell'
@@ -34,46 +34,45 @@ import './index.css'
 
 type TabId = 'dashboard' | 'workout' | 'templates' | 'exercises' | 'history' | 'settings'
 
-const tabs: Array<{ id: TabId; label: string; path: string }> = [
-  { id: 'dashboard', label: 'Home', path: '/' },
-  { id: 'workout', label: 'Log', path: '/workout' },
-  { id: 'templates', label: 'Plans', path: '/templates' },
-  { id: 'history', label: 'PRs', path: '/history' },
-]
+const routes: Record<
+  TabId,
+  { title: string; path: string; navLabel?: string; moreMenu?: boolean; navIcon?: string }
+> = {
+  dashboard: { title: 'Home', path: '/', navLabel: 'Home', navIcon: 'O' },
+  workout: { title: 'Log', path: '/workout', navLabel: 'Log', navIcon: '+' },
+  templates: { title: 'Plans', path: '/templates', navLabel: 'Plans', navIcon: '=' },
+  history: { title: 'PRs', path: '/history', navLabel: 'PRs', navIcon: '^' },
+  exercises: { title: 'Exercises', path: '/exercises', moreMenu: true },
+  settings: { title: 'Settings', path: '/settings', moreMenu: true },
+}
+
+const primaryTabs: TabId[] = ['dashboard', 'workout', 'templates', 'history']
+const moreMenuTabs: TabId[] = ['exercises', 'settings']
 
 const routeToTab: Array<{ path: string; id: TabId }> = [
-  { path: '/workout', id: 'workout' },
-  { path: '/templates', id: 'templates' },
-  { path: '/history', id: 'history' },
-  { path: '/exercises', id: 'exercises' },
-  { path: '/settings', id: 'settings' },
-  { path: '/', id: 'dashboard' },
+  { path: routes.workout.path, id: 'workout' },
+  { path: routes.templates.path, id: 'templates' },
+  { path: routes.history.path, id: 'history' },
+  { path: routes.exercises.path, id: 'exercises' },
+  { path: routes.settings.path, id: 'settings' },
+  { path: routes.dashboard.path, id: 'dashboard' },
 ]
 
 function App() {
   const [isMoreOpen, setIsMoreOpen] = useState(false)
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
-  const [refreshKey, setRefreshKey] = useState(0)
   const location = useLocation()
   const navigate = useNavigate()
 
-  const exercises = useLiveQuery(() => listAllExercises(), [refreshKey], [])
-  const templates = useLiveQuery(() => listTemplates(), [refreshKey], [])
-  const activeWorkout = useLiveQuery(() => getActiveWorkout(), [refreshKey], null)
-  const history = useLiveQuery(() => listWorkoutHistory(), [refreshKey], [])
-  const preferencesQuery = useLiveQuery(() => getPreferences(), [refreshKey], null)
-  const analytics = useLiveQuery(() => getAnalytics(), [refreshKey], [])
-  const pendingSyncCountQuery = useLiveQuery(() => getSyncQueueCount(), [refreshKey], 0)
+  const exercises = useLiveQuery(() => listAllExercises(), [], [])
+  const templates = useLiveQuery(() => listTemplates(), [], [])
+  const activeWorkout = useLiveQuery(() => getActiveWorkout(), [], null)
+  const history = useLiveQuery(() => listWorkoutHistory(), [], [])
+  const preferencesQuery = useLiveQuery(() => getPreferences(), [], null)
+  const analytics = useLiveQuery(() => getAnalytics(), [], [])
+  const pendingSyncCountQuery = useLiveQuery(() => getSyncQueueCount(), [], 0)
   const preferences = preferencesQuery ?? null
   const pendingSyncCount = pendingSyncCountQuery ?? 0
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setRefreshKey((value) => value + 1)
-    }, 1000)
-
-    return () => window.clearInterval(interval)
-  }, [])
 
   const activeTab = useMemo<TabId>(() => {
     const match = routeToTab.find(({ path }) =>
@@ -95,14 +94,9 @@ function App() {
     return null
   }, [activeWorkout, pendingSyncCount])
 
-  async function refresh() {
-    setRefreshKey((value) => value + 1)
-  }
-
   async function handleRunSync() {
     const result = await runSync()
     setSyncMessage(result.message)
-    await refresh()
   }
 
   const content = (() => {
@@ -117,8 +111,7 @@ function App() {
             preferences={preferences}
             onStartTemplate={async (templateId) => {
               await startWorkoutFromTemplate(templateId)
-              navigate('/workout')
-              await refresh()
+              navigate(routes.workout.path)
             }}
           />
         )
@@ -131,36 +124,28 @@ function App() {
             timerEndAt={preferences?.activeTimerEndAt ?? null}
             onCreateQuickWorkout={async (name, exerciseIds) => {
               await createQuickWorkout(name, exerciseIds)
-              await refresh()
             }}
             onUpdateLoggedSet={async (setId, updates) => {
               await updateLoggedSet(setId, updates)
-              await refresh()
             }}
             onAddSet={async (workoutExerciseId) => {
               await addSetToWorkoutExercise(workoutExerciseId)
-              await refresh()
             }}
             onRemoveSet={async (setId) => {
               await removeSetFromWorkout(setId)
-              await refresh()
             }}
             onAddExerciseToWorkout={async (workoutId, exerciseId) => {
               await addExerciseToWorkout(workoutId, exerciseId)
-              await refresh()
             }}
             onRemoveExerciseFromWorkout={async (workoutExerciseId) => {
               await removeExerciseFromWorkout(workoutExerciseId)
-              await refresh()
             }}
             onCompleteWorkout={async (workoutId) => {
               await completeWorkout(workoutId)
-              navigate('/history')
-              await refresh()
+              navigate(routes.history.path)
             }}
             onCancelRestTimer={async () => {
               await cancelRestTimer()
-              await refresh()
             }}
           />
         )
@@ -172,12 +157,10 @@ function App() {
             weightUnit={preferences?.weightUnit ?? 'lb'}
             onCreateTemplate={async (input) => {
               await createTemplate(input)
-              await refresh()
             }}
             onStartTemplate={async (templateId) => {
               await startWorkoutFromTemplate(templateId)
-              navigate('/workout')
-              await refresh()
+              navigate(routes.workout.path)
             }}
           />
         )
@@ -189,7 +172,6 @@ function App() {
             exercises={exercises}
             onCreateExercise={async (input) => {
               await createExercise(input)
-              await refresh()
             }}
           />
         )
@@ -202,11 +184,9 @@ function App() {
             syncMessage={syncMessage}
             onWeightUnitChange={async (unit) => {
               await savePreferences({ weightUnit: unit })
-              await refresh()
             }}
             onDefaultRestChange={async (seconds) => {
               await savePreferences({ defaultRestSeconds: seconds })
-              await refresh()
             }}
             onRunSync={handleRunSync}
           />
@@ -218,24 +198,24 @@ function App() {
 
   return (
     <AppShell
-      title={activeTab === 'dashboard' ? 'Home' : routeToTab.find((route) => route.id === activeTab)?.id === 'settings' ? 'Settings' : tabs.find((tab) => tab.id === activeTab)?.label ?? (activeTab === 'exercises' ? 'Exercises' : 'Stronk')}
+      title={routes[activeTab].title}
       status={status}
-      onStatusClick={activeWorkout ? () => navigate('/workout') : undefined}
+      onStatusClick={activeWorkout ? () => navigate(routes.workout.path) : undefined}
       footer={
         <>
-          {tabs.map((tab) => (
+          {primaryTabs.map((tabId) => (
             <button
-              key={tab.id}
-              className={activeTab === tab.id ? 'nav-button active' : 'nav-button'}
+              key={tabId}
+              className={activeTab === tabId ? 'nav-button active' : 'nav-button'}
               onClick={() => {
-                navigate(tab.path)
+                navigate(routes[tabId].path)
                 setIsMoreOpen(false)
               }}
             >
               <span className="nav-icon" aria-hidden="true">
-                {tab.id === 'dashboard' ? 'O' : tab.id === 'workout' ? '+' : tab.id === 'templates' ? '=' : '^'}
+                {routes[tabId].navIcon}
               </span>
-              <span className="nav-label">{tab.label}</span>
+              <span className="nav-label">{routes[tabId].navLabel}</span>
             </button>
           ))}
           <button
@@ -252,24 +232,18 @@ function App() {
     >
       {isMoreOpen ? (
         <div className="more-sheet">
-          <button
-            className={activeTab === 'exercises' ? 'ghost-button active-sheet' : 'ghost-button'}
-            onClick={() => {
-              navigate('/exercises')
-              setIsMoreOpen(false)
-            }}
-          >
-            Exercise library
-          </button>
-          <button
-            className={activeTab === 'settings' ? 'ghost-button active-sheet' : 'ghost-button'}
-            onClick={() => {
-              navigate('/settings')
-              setIsMoreOpen(false)
-            }}
-          >
-            Settings & sync
-          </button>
+          {moreMenuTabs.map((tabId) => (
+            <button
+              key={tabId}
+              className={activeTab === tabId ? 'ghost-button active-sheet' : 'ghost-button'}
+              onClick={() => {
+                navigate(routes[tabId].path)
+                setIsMoreOpen(false)
+              }}
+            >
+              {tabId === 'exercises' ? 'Exercise library' : 'Settings & sync'}
+            </button>
+          ))}
         </div>
       ) : null}
       {content}

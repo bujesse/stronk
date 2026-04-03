@@ -12,6 +12,33 @@ const entityTables = {
   loggedSet: 'logged_sets',
 } as const
 
+const entityStores = {
+  exercise: db.exercises,
+  workoutTemplate: db.workoutTemplates,
+  templateExercise: db.templateExercises,
+  templateSet: db.templateSets,
+  workout: db.workouts,
+  workoutExercise: db.workoutExercises,
+  loggedSet: db.loggedSets,
+} as const
+
+async function updateRecordSyncStatus(
+  entity: keyof typeof entityStores,
+  entityId: string,
+  syncStatus: 'synced' | 'error',
+) {
+  const store = entityStores[entity]
+  const record = await store.get(entityId)
+  if (!record) {
+    return
+  }
+
+  await store.update(entityId, {
+    syncStatus,
+    updatedAt: new Date().toISOString(),
+  })
+}
+
 export async function runSync() {
   const supabase = getSupabaseClient()
   if (!supabase) {
@@ -60,9 +87,19 @@ export async function runSync() {
         }
       }
 
+      await updateRecordSyncStatus(
+        item.entity as keyof typeof entityStores,
+        item.entityId,
+        'synced',
+      )
       await db.syncQueue.delete(item.id)
       syncedCount += 1
     } catch (error) {
+      await updateRecordSyncStatus(
+        item.entity as keyof typeof entityStores,
+        item.entityId,
+        'error',
+      )
       await db.syncQueue.update(item.id, {
         status: 'failed',
         updatedAt: new Date().toISOString(),
