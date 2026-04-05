@@ -67,7 +67,7 @@ export function WorkoutScreen({
         <SectionCard title="Quick workout" description="Build an ad hoc session without making a template.">
           <div className="form-grid">
             <input value={quickName} onChange={(event) => setQuickName(event.target.value)} placeholder="Upper body" />
-            <div className="inline-actions">
+            <div className="inline-actions align-end">
               <DropdownField
                 label="Exercise"
                 value={quickExerciseToAdd}
@@ -150,7 +150,7 @@ export function WorkoutScreen({
 
       <div className="floating-select-card">
         <SectionCard title="Add exercise" description="Drop movements into the current session without leaving the workout.">
-          <div className="inline-actions">
+          <div className="inline-actions align-end">
             <DropdownField
               label="Exercise"
               value={exerciseToAdd}

@@ -1,29 +1,31 @@
 import { db } from '../db/appDb'
 import { getSupabaseClient } from './client'
-import type { SyncQueueItem } from '../lib/types'
+import {
+  deserializeFromRemote,
+  entityStores,
+  getLocalRecord,
+  getRemoteTable,
+  isSyncEntityName,
+  putLocalRecord,
+  serializeForRemote,
+} from './schema'
+import type { Preferences, SyncQueueItem } from '../lib/types'
 
-const entityTables = {
-  exercise: 'exercises',
-  workoutTemplate: 'workout_templates',
-  templateExercise: 'template_exercises',
-  templateSet: 'template_sets',
-  workout: 'workouts',
-  workoutExercise: 'workout_exercises',
-  loggedSet: 'logged_sets',
-} as const
+const syncPullOrder = [
+  'exercise',
+  'workoutTemplate',
+  'templateExercise',
+  'templateSet',
+  'workout',
+  'workoutExercise',
+  'loggedSet',
+  'preferences',
+] as const
 
-const entityStores = {
-  exercise: db.exercises,
-  workoutTemplate: db.workoutTemplates,
-  templateExercise: db.templateExercises,
-  templateSet: db.templateSets,
-  workout: db.workouts,
-  workoutExercise: db.workoutExercises,
-  loggedSet: db.loggedSets,
-} as const
+type SyncEntityName = (typeof syncPullOrder)[number]
 
 async function updateRecordSyncStatus(
-  entity: keyof typeof entityStores,
+  entity: Exclude<SyncEntityName, 'preferences'>,
   entityId: string,
   syncStatus: 'synced' | 'error',
 ) {
@@ -35,8 +37,109 @@ async function updateRecordSyncStatus(
 
   await store.update(entityId, {
     syncStatus,
-    updatedAt: new Date().toISOString(),
   })
+}
+
+function isRemoteNewer(localUpdatedAt: string, remoteUpdatedAt: string) {
+  return new Date(remoteUpdatedAt).getTime() > new Date(localUpdatedAt).getTime()
+}
+
+async function pushQueuedChanges(userId: string) {
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    return { pushedCount: 0, failedCount: 0 }
+  }
+
+  const queued = await db.syncQueue.where('status').anyOf('queued', 'failed').sortBy('createdAt')
+  let pushedCount = 0
+  let failedCount = 0
+
+  for (const item of queued) {
+    if (!isSyncEntityName(item.entity)) {
+      continue
+    }
+
+    await db.syncQueue.update(item.id, {
+      status: 'processing',
+      updatedAt: new Date().toISOString(),
+      errorMessage: null,
+    })
+
+    try {
+      const payload = serializeForRemote(item.entity, item.payload as never, userId)
+      const { error } = await supabase.from(getRemoteTable(item.entity)).upsert(payload)
+      if (error) {
+        throw error
+      }
+
+      if (item.entity !== 'preferences') {
+        await updateRecordSyncStatus(item.entity, item.entityId, 'synced')
+      }
+
+      await db.syncQueue.delete(item.id)
+      pushedCount += 1
+    } catch (error) {
+      if (item.entity !== 'preferences') {
+        await updateRecordSyncStatus(item.entity, item.entityId, 'error')
+      }
+
+      await db.syncQueue.update(item.id, {
+        status: 'failed',
+        updatedAt: new Date().toISOString(),
+        errorMessage: error instanceof Error ? error.message : 'Unknown sync error',
+      } satisfies Partial<SyncQueueItem>)
+      failedCount += 1
+    }
+  }
+
+  return { pushedCount, failedCount }
+}
+
+async function pullRemoteChanges(userId: string) {
+  const supabase = getSupabaseClient()
+  if (!supabase) {
+    return { pulledCount: 0 }
+  }
+
+  let pulledCount = 0
+
+  for (const entity of syncPullOrder) {
+    const { data, error } = await supabase
+      .from(getRemoteTable(entity))
+      .select('*')
+      .eq('user_id', userId)
+
+    if (error) {
+      throw error
+    }
+
+    for (const row of data ?? []) {
+      const remoteRecord = deserializeFromRemote(entity, row)
+      const localRecord = await getLocalRecord(entity, remoteRecord.id)
+
+      if (!localRecord) {
+        await putLocalRecord(entity, remoteRecord)
+        pulledCount += 1
+        continue
+      }
+
+      if (isRemoteNewer(localRecord.updatedAt, remoteRecord.updatedAt)) {
+        if (entity === 'preferences') {
+          const localPreferences = localRecord as Preferences
+          const remotePreferences = remoteRecord as Preferences
+          await putLocalRecord(entity, {
+            ...remotePreferences,
+            activeTimerEndAt: localPreferences.activeTimerEndAt,
+          })
+        } else {
+          await putLocalRecord(entity, remoteRecord)
+        }
+        pulledCount += 1
+      }
+    }
+  }
+
+  return { pulledCount }
 }
 
 export async function runSync() {
@@ -55,61 +158,29 @@ export async function runSync() {
   if (!session?.user) {
     return {
       ok: false,
-      message: 'Sign in is not wired yet. Local-first mode is active.',
+      message: 'Sign in to sync this device.',
     }
   }
 
-  const queued = await db.syncQueue.where('status').anyOf('queued', 'failed').sortBy('createdAt')
-  let syncedCount = 0
+  const { pushedCount, failedCount } = await pushQueuedChanges(session.user.id)
+  const { pulledCount } = await pullRemoteChanges(session.user.id)
 
-  for (const item of queued) {
-    const table = entityTables[item.entity as keyof typeof entityTables]
-    if (!table) {
-      continue
+  if (failedCount > 0) {
+    return {
+      ok: false,
+      message: `Synced ${pushedCount} changes, pulled ${pulledCount}, ${failedCount} failed.`,
     }
+  }
 
-    await db.syncQueue.update(item.id, { status: 'processing', updatedAt: new Date().toISOString() })
-
-    try {
-      if (item.operation === 'delete') {
-        const { error } = await supabase.from(table).delete().eq('id', item.entityId)
-        if (error) {
-          throw error
-        }
-      } else {
-        const payload = {
-          ...item.payload,
-          user_id: session.user.id,
-        }
-        const { error } = await supabase.from(table).upsert(payload)
-        if (error) {
-          throw error
-        }
-      }
-
-      await updateRecordSyncStatus(
-        item.entity as keyof typeof entityStores,
-        item.entityId,
-        'synced',
-      )
-      await db.syncQueue.delete(item.id)
-      syncedCount += 1
-    } catch (error) {
-      await updateRecordSyncStatus(
-        item.entity as keyof typeof entityStores,
-        item.entityId,
-        'error',
-      )
-      await db.syncQueue.update(item.id, {
-        status: 'failed',
-        updatedAt: new Date().toISOString(),
-        errorMessage: error instanceof Error ? error.message : 'Unknown sync error',
-      } satisfies Partial<SyncQueueItem>)
+  if (pushedCount === 0 && pulledCount === 0) {
+    return {
+      ok: true,
+      message: 'Already up to date.',
     }
   }
 
   return {
     ok: true,
-    message: syncedCount > 0 ? `Synced ${syncedCount} changes.` : 'Already up to date.',
+    message: `Synced ${pushedCount} changes and pulled ${pulledCount}.`,
   }
 }

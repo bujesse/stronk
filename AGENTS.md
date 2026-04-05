@@ -25,10 +25,12 @@
 - All user-created entities must carry `id`, `updatedAt`, and `syncStatus`.
 - Use soft deletes for synced entities.
 - Keep queue metadata separate from domain records.
+- Preferences are the exception to per-record `syncStatus`; they sync through queued payloads but keep device-local timer state out of the cloud copy.
 - Exercise records must declare a `trackingMode`; do not assume every movement is load-based.
 - Exercise records should store a broad `bodyRegion` plus a more specific `muscleGroup`; do not collapse this back into one free-text field.
 - Store load values in the canonical internal unit, then convert at the UI boundary based on preferences.
 - Assisted movements must use a dedicated assistance field, not negative numbers in the main load field.
+- Seed exercise IDs must stay deterministic across installs; do not revert to random IDs for seeded records.
 
 ## UX Rules
 
@@ -39,6 +41,7 @@
 - Render only the fields relevant to the exercise tracking mode in templates and live workout logging.
 - Progression views must stay mode-aware; do not compare bodyweight, assisted, and loaded movements with one generic “best weight” rule.
 - When creating or seeding exercises, prefer the structured taxonomy format such as `Arms > Triceps` or `Back > Lats` in display terms, backed by separate stored fields.
+- Signed-in users should not have to manually export or import data between devices; sync should remain local-first but converge through push + pull.
 
 ## Quality
 

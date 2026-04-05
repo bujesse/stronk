@@ -147,6 +147,10 @@ h1 {
   align-items: center;
 }
 
+.inline-actions.align-end {
+  align-items: flex-end;
+}
+
 .select-field {
   position: relative;
   display: grid;

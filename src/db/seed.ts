@@ -1,5 +1,4 @@
 import type { Exercise } from '../lib/types'
-import { createId } from '../lib/id'
 import { nowIso } from '../lib/time'
 
 const defaults = [
@@ -69,7 +68,7 @@ export function createSeedExercises() {
   const timestamp = nowIso()
 
   return defaults.map<Exercise>(([name, bodyRegion, muscleGroup, equipment, trackingMode, rest]) => ({
-    id: createId('exercise'),
+    id: `exercise_seed_${name.toLowerCase().replaceAll(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')}`,
     name,
     bodyRegion,
     muscleGroup,

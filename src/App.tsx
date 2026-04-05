@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { AppShell } from './app/AppShell'
@@ -30,6 +30,13 @@ import {
   updateLoggedSet,
 } from './db/repository'
 import { runSync } from './sync/runSync'
+import { useAuthSession } from './hooks/useAuthSession'
+import {
+  isSupabaseConfigured,
+  signInWithPassword,
+  signOut,
+  signUpWithPassword,
+} from './sync/client'
 import './index.css'
 
 type TabId = 'dashboard' | 'workout' | 'templates' | 'exercises' | 'history' | 'settings'
@@ -63,6 +70,9 @@ function App() {
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const location = useLocation()
   const navigate = useNavigate()
+  const { session, ready: authReady } = useAuthSession()
+  const lastAutoSyncedUserIdRef = useRef<string | null>(null)
+  const isAutoSyncingRef = useRef(false)
 
   const exercises = useLiveQuery(() => listAllExercises(), [], [])
   const templates = useLiveQuery(() => listTemplates(), [], [])
@@ -73,6 +83,7 @@ function App() {
   const pendingSyncCountQuery = useLiveQuery(() => getSyncQueueCount(), [], 0)
   const preferences = preferencesQuery ?? null
   const pendingSyncCount = pendingSyncCountQuery ?? 0
+  const syncConfigured = isSupabaseConfigured()
 
   const activeTab = useMemo<TabId>(() => {
     const match = routeToTab.find(({ path }) =>
@@ -98,6 +109,48 @@ function App() {
     const result = await runSync()
     setSyncMessage(result.message)
   }
+
+  useEffect(() => {
+    if (!authReady) {
+      return
+    }
+
+    if (!session?.userId) {
+      lastAutoSyncedUserIdRef.current = null
+      return
+    }
+
+    if (lastAutoSyncedUserIdRef.current === session.userId) {
+      return
+    }
+
+    lastAutoSyncedUserIdRef.current = session.userId
+    void runSync().then((result) => {
+      setSyncMessage(result.message)
+    })
+  }, [authReady, session?.userId])
+
+  useEffect(() => {
+    if (!syncConfigured || !session || pendingSyncCount === 0 || isAutoSyncingRef.current) {
+      return
+    }
+
+    isAutoSyncingRef.current = true
+    const timeoutId = window.setTimeout(() => {
+      void runSync()
+        .then((result) => {
+          setSyncMessage(result.message)
+        })
+        .finally(() => {
+          isAutoSyncingRef.current = false
+        })
+    }, 1200)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+      isAutoSyncingRef.current = false
+    }
+  }, [pendingSyncCount, session, syncConfigured])
 
   const content = (() => {
     switch (activeTab) {
@@ -178,10 +231,25 @@ function App() {
       case 'settings':
         return (
           <SettingsScreen
+            syncConfigured={syncConfigured}
+            authReady={authReady}
+            authSession={session}
             weightUnit={preferences?.weightUnit ?? 'lb'}
             defaultRestSeconds={preferences?.defaultRestSeconds ?? 120}
             pendingSyncCount={pendingSyncCount}
             syncMessage={syncMessage}
+            onSignIn={async (email, password) => {
+              const result = await signInWithPassword(email, password)
+              setSyncMessage(result.message)
+            }}
+            onSignUp={async (email, password) => {
+              const result = await signUpWithPassword(email, password)
+              setSyncMessage(result.message)
+            }}
+            onSignOut={async () => {
+              const result = await signOut()
+              setSyncMessage(result.message)
+            }}
             onWeightUnitChange={async (unit) => {
               await savePreferences({ weightUnit: unit })
             }}

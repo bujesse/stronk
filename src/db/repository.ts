@@ -56,6 +56,16 @@ export async function savePreferences(updates: Partial<Preferences>) {
   }
 
   await db.preferences.put(next)
+
+  const syncableUpdates = Object.keys(updates).filter((key) => key !== 'activeTimerEndAt')
+  if (syncableUpdates.length > 0) {
+    await queue('preferences', next.id, 'upsert', {
+      id: next.id,
+      weightUnit: next.weightUnit,
+      defaultRestSeconds: next.defaultRestSeconds,
+      updatedAt: next.updatedAt,
+    })
+  }
 }
 
 export async function createExercise(input: {
@@ -465,7 +475,7 @@ export async function removeSetFromWorkout(setId: string) {
   }
 
   await db.loggedSets.put(next)
-  await queue('loggedSet', next.id, 'delete', { id: next.id })
+  await queue('loggedSet', next.id, 'delete', next)
 }
 
 export async function addExerciseToWorkout(workoutId: string, exerciseId: string) {
@@ -524,7 +534,7 @@ export async function removeExerciseFromWorkout(workoutExerciseId: string) {
   }
 
   await db.workoutExercises.put(next)
-  await queue('workoutExercise', next.id, 'delete', { id: next.id })
+  await queue('workoutExercise', next.id, 'delete', next)
 
   const sets = await db.loggedSets.where({ workoutExerciseId }).toArray()
   for (const set of sets) {
@@ -540,7 +550,7 @@ export async function removeExerciseFromWorkout(workoutExerciseId: string) {
     }
 
     await db.loggedSets.put(deletedSet)
-    await queue('loggedSet', deletedSet.id, 'delete', { id: deletedSet.id })
+    await queue('loggedSet', deletedSet.id, 'delete', deletedSet)
   }
 }
 

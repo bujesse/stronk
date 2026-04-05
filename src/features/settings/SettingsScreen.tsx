@@ -1,25 +1,42 @@
+import { useState } from 'react'
 import { DropdownField } from '../../components/DropdownField'
 import { SectionCard } from '../../components/SectionCard'
+import type { AuthSessionInfo } from '../../lib/types'
 
 interface SettingsScreenProps {
+  syncConfigured: boolean
+  authReady: boolean
+  authSession: AuthSessionInfo | null
   weightUnit: 'lb' | 'kg'
   defaultRestSeconds: number
   pendingSyncCount: number
   syncMessage: string | null
+  onSignIn: (email: string, password: string) => Promise<void>
+  onSignUp: (email: string, password: string) => Promise<void>
+  onSignOut: () => Promise<void>
   onWeightUnitChange: (unit: 'lb' | 'kg') => Promise<void>
   onDefaultRestChange: (seconds: number) => Promise<void>
   onRunSync: () => Promise<void>
 }
 
 export function SettingsScreen({
+  syncConfigured,
+  authReady,
+  authSession,
   weightUnit,
   defaultRestSeconds,
   pendingSyncCount,
   syncMessage,
+  onSignIn,
+  onSignUp,
+  onSignOut,
   onWeightUnitChange,
   onDefaultRestChange,
   onRunSync,
 }: SettingsScreenProps) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+
   return (
     <div className="stack">
       <SectionCard title="Preferences" description="Local settings sync once cloud backup is configured.">
@@ -45,13 +62,64 @@ export function SettingsScreen({
         </div>
       </SectionCard>
 
-      <SectionCard title="Sync" description="Offline-first remains fully usable without cloud credentials.">
+      <SectionCard
+        title="Account"
+        description={
+          syncConfigured
+            ? 'Sign in to sync workouts, templates, custom exercises, and preferences across devices.'
+            : 'Add Supabase env vars to enable sign in and cloud sync.'
+        }
+      >
+        {!syncConfigured ? (
+          <p className="info-callout">Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.</p>
+        ) : !authReady ? (
+          <p className="info-callout">Checking session…</p>
+        ) : authSession ? (
+          <div className="stack compact">
+            <p className="info-callout">Signed in as {authSession.email ?? authSession.userId}.</p>
+            <button className="ghost-button" onClick={onSignOut}>
+              Sign out
+            </button>
+          </div>
+        ) : (
+          <div className="stack compact">
+            <label className="field-label">
+              Email
+              <input
+                value={email}
+                type="email"
+                autoComplete="email"
+                onChange={(event) => setEmail(event.target.value)}
+              />
+            </label>
+            <label className="field-label">
+              Password
+              <input
+                value={password}
+                type="password"
+                autoComplete="current-password"
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </label>
+            <div className="inline-actions">
+              <button className="primary-button" onClick={() => onSignIn(email, password)}>
+                Sign in
+              </button>
+              <button className="ghost-button" onClick={() => onSignUp(email, password)}>
+                Create account
+              </button>
+            </div>
+          </div>
+        )}
+      </SectionCard>
+
+      <SectionCard title="Sync" description="This device writes locally first, then pushes and pulls the cloud copy.">
         <div className="sync-panel">
           <div>
             <strong>{pendingSyncCount}</strong>
             <p>queued local changes</p>
           </div>
-          <button className="primary-button" onClick={onRunSync}>
+          <button className="primary-button" onClick={onRunSync} disabled={!syncConfigured || !authSession}>
             Run sync
           </button>
         </div>

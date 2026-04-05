@@ -63,9 +63,13 @@
 
 - All writes land locally first.
 - User-created records use client UUIDs.
+- Seed exercises use deterministic IDs so templates and workout history resolve consistently across devices.
 - Mutations enqueue for later sync.
-- Deletes are soft deletes with tombstones.
+- Signed-in devices push queued local mutations and pull the full remote dataset into Dexie.
+- Deletes are soft deletes with tombstones locally and remotely.
 - Conflict resolution is last-write-wins on `updatedAt`.
+- Sync tables in Supabase use snake_case columns with per-user row ownership enforced by RLS.
+- Preferences sync only the shared fields (`weightUnit`, `defaultRestSeconds`); active rest timers remain device-local.
 - If Supabase is not configured, the app remains fully local.
 
 ## Milestones

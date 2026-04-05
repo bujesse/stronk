@@ -110,6 +110,11 @@ export interface Preferences {
   updatedAt: string
 }
 
+export interface AuthSessionInfo {
+  userId: string
+  email: string | null
+}
+
 export interface SyncQueueItem {
   id: string
   entity: string
