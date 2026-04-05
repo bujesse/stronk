@@ -5,16 +5,17 @@ import {
   type User,
 } from '@supabase/supabase-js'
 import type { AuthSessionInfo } from '../lib/types'
+import { getSupabaseAnonKey, getSupabaseUrl } from '../lib/config'
 
 let cachedClient: SupabaseClient | null = null
 
 export function isSupabaseConfigured() {
-  return Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY)
+  return Boolean(getSupabaseUrl() && getSupabaseAnonKey())
 }
 
 export function getSupabaseClient() {
-  const url = import.meta.env.VITE_SUPABASE_URL
-  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+  const url = getSupabaseUrl()
+  const anonKey = getSupabaseAnonKey()
 
   if (!url || !anonKey) {
     return null

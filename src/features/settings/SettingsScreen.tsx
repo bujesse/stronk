@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { ExercisesScreen } from '../exercises/ExercisesScreen'
 import { DropdownField } from '../../components/DropdownField'
 import { SectionCard } from '../../components/SectionCard'
-import type { AuthSessionInfo } from '../../lib/types'
+import type { AuthSessionInfo, BodyRegion, Exercise, TrackingMode, WeightUnit } from '../../lib/types'
 
 interface SettingsScreenProps {
+  exercises: Exercise[]
   syncConfigured: boolean
   authReady: boolean
   authSession: AuthSessionInfo | null
@@ -17,9 +19,31 @@ interface SettingsScreenProps {
   onWeightUnitChange: (unit: 'lb' | 'kg') => Promise<void>
   onDefaultRestChange: (seconds: number) => Promise<void>
   onRunSync: () => Promise<void>
+  onCreateExercise: (input: {
+    movementName: string
+    bodyRegion?: BodyRegion | null
+    muscleGroup?: string
+    equipment?: string
+    preferredWeightUnit?: WeightUnit | null
+    trackingMode: TrackingMode
+    defaultRestSeconds?: number | null
+  }) => Promise<void>
+  onUpdateExercise: (
+    exerciseId: string,
+    input: {
+      movementName: string
+      bodyRegion?: BodyRegion | null
+      muscleGroup?: string
+      equipment?: string
+      preferredWeightUnit?: WeightUnit | null
+      trackingMode: TrackingMode
+      defaultRestSeconds?: number | null
+    },
+  ) => Promise<void>
 }
 
 export function SettingsScreen({
+  exercises,
   syncConfigured,
   authReady,
   authSession,
@@ -33,6 +57,8 @@ export function SettingsScreen({
   onWeightUnitChange,
   onDefaultRestChange,
   onRunSync,
+  onCreateExercise,
+  onUpdateExercise,
 }: SettingsScreenProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -125,6 +151,12 @@ export function SettingsScreen({
         </div>
         {syncMessage ? <p className="info-callout">{syncMessage}</p> : null}
       </SectionCard>
+
+      <ExercisesScreen
+        exercises={exercises}
+        onCreateExercise={onCreateExercise}
+        onUpdateExercise={onUpdateExercise}
+      />
     </div>
   )
 }

@@ -72,6 +72,10 @@ textarea {
   resize: vertical;
 }
 
+summary {
+  cursor: pointer;
+}
+
 .app-shell {
   width: min(100%, 860px);
   margin: 0 auto;
@@ -149,6 +153,12 @@ h1 {
 
 .inline-actions.align-end {
   align-items: flex-end;
+}
+
+.add-exercise-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
 }
 
 .select-field {
@@ -297,6 +307,43 @@ h1 {
   padding: 1rem;
 }
 
+.hero-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.list-card-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.workout-note-preview {
+  margin-top: 0.8rem;
+}
+
+.exercise-note-preview {
+  margin-bottom: 0.8rem;
+}
+
+.active-note-button {
+  color: var(--accent-strong);
+  background: rgba(255, 154, 61, 0.16);
+}
+
+.note-history {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 0.8rem;
+}
+
+.note-history summary {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
 .grid-list,
 .set-grid,
 .stats-grid,
@@ -348,6 +395,28 @@ h1 {
   padding: 0.72rem 0.85rem;
 }
 
+.warmup-toggle {
+  min-width: 2.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border-radius: 18px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.compact-icon-button {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+}
+
 .ghost-button,
 .chip-button,
 .nav-button {
@@ -379,9 +448,13 @@ h1 {
   transform: translateY(-1px);
 }
 
+.left-align {
+  text-align: left;
+}
+
 .set-row {
   display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr) minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto;
   gap: 0.6rem;
   align-items: center;
   padding: 0.8rem;
@@ -389,8 +462,73 @@ h1 {
   background: rgba(255, 250, 241, 0.04);
 }
 
+.set-actions {
+  display: inline-flex;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.template-set-actions {
+  justify-content: flex-start;
+}
+
+.template-set-row {
+  grid-template-columns: auto auto minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+
+.input-with-suffix {
+  position: relative;
+  display: block;
+}
+
+.input-with-suffix input {
+  padding-right: 3.2rem;
+}
+
+.field-suffix {
+  position: absolute;
+  top: 50%;
+  right: 0.9rem;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+
 .set-row.done {
   outline: 1px solid rgba(255, 154, 61, 0.35);
+}
+
+.set-row.warmup {
+  background: rgba(255, 233, 197, 0.08);
+  outline: 1px dashed rgba(255, 190, 124, 0.28);
+}
+
+.set-row.warmup span {
+  color: var(--accent-strong);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: end center;
+  padding: 1rem;
+  background: rgba(9, 6, 4, 0.7);
+  backdrop-filter: blur(8px);
+}
+
+.modal-card {
+  width: min(100%, 34rem);
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+  border-radius: 24px;
+  border: 1px solid var(--border);
+  background: rgba(24, 17, 13, 0.98);
+  box-shadow: var(--shadow);
 }
 
 .empty-state,
@@ -456,6 +594,12 @@ h1 {
   font-weight: 700;
 }
 
+.nav-icon svg,
+.compact-icon-button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
 .nav-label {
   font-size: 0.68rem;
   white-space: nowrap;
@@ -506,12 +650,34 @@ h1 {
   }
 
   .set-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
   }
 
-  .set-row span,
-  .set-row button {
-    grid-column: span 2;
+  .template-set-row {
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .set-row .wide-input {
+    grid-column: 2 / -1;
+  }
+
+  .set-actions {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .set-actions > * {
+    width: 100%;
+  }
+
+  .add-exercise-row {
+    grid-template-columns: 1fr;
+  }
+
+  .add-exercise-row > .primary-button {
+    width: 100%;
   }
 
   .section-header,
@@ -527,5 +693,9 @@ h1 {
 
   .section-actions > * {
     flex: 1;
+  }
+
+  .exercise-card-actions .compact-icon-button {
+    flex: 0 0 2.5rem;
   }
 }

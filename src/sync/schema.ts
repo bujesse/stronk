@@ -36,10 +36,11 @@ type RemoteBaseRow = {
 }
 
 type RemoteExerciseRow = RemoteBaseRow & {
-  name: string
+  movement_name: string
   body_region: Exercise['bodyRegion']
   muscle_group: string | null
   equipment: string | null
+  preferred_weight_unit: Exercise['preferredWeightUnit']
   tracking_mode: Exercise['trackingMode']
   default_rest_seconds: number | null
   is_custom: boolean
@@ -65,9 +66,11 @@ type RemoteTemplateExerciseRow = RemoteBaseRow & {
 type RemoteTemplateSetRow = RemoteBaseRow & {
   template_exercise_id: string
   sort_order: number
+  set_kind: TemplateSet['setKind']
   target_reps: number | null
   target_weight: number | null
   target_assistance_weight: number | null
+  target_duration_seconds: number | null
   deleted_at: string | null
   created_at: string
 }
@@ -75,6 +78,8 @@ type RemoteTemplateSetRow = RemoteBaseRow & {
 type RemoteWorkoutRow = RemoteBaseRow & {
   template_id: string | null
   name: string
+  notes: string
+  calories_burned: number | null
   status: Workout['status']
   started_at: string
   ended_at: string | null
@@ -85,6 +90,7 @@ type RemoteWorkoutRow = RemoteBaseRow & {
 type RemoteWorkoutExerciseRow = RemoteBaseRow & {
   workout_id: string
   exercise_id: string
+  notes: string
   sort_order: number
   deleted_at: string | null
   created_at: string
@@ -94,9 +100,11 @@ type RemoteLoggedSetRow = RemoteBaseRow & {
   workout_exercise_id: string
   planned_set_id: string | null
   sort_order: number
+  set_kind: LoggedSet['setKind']
   reps: number | null
   weight: number | null
   assistance_weight: number | null
+  duration_seconds: number | null
   completed_at: string | null
   deleted_at: string | null
   created_at: string
@@ -137,10 +145,11 @@ const syncEntityConfigs = {
     serialize: (record: Exercise, userId: string): RemoteExerciseRow => ({
       id: record.id,
       user_id: userId,
-      name: record.name,
+      movement_name: record.movementName,
       body_region: record.bodyRegion,
       muscle_group: record.muscleGroup,
       equipment: record.equipment,
+      preferred_weight_unit: record.preferredWeightUnit,
       tracking_mode: record.trackingMode,
       default_rest_seconds: record.defaultRestSeconds,
       is_custom: record.isCustom,
@@ -150,10 +159,11 @@ const syncEntityConfigs = {
     }),
     deserialize: (row: RemoteExerciseRow): Exercise => ({
       id: row.id,
-      name: row.name,
+      movementName: row.movement_name,
       bodyRegion: row.body_region,
       muscleGroup: row.muscle_group,
       equipment: row.equipment,
+      preferredWeightUnit: row.preferred_weight_unit,
       trackingMode: row.tracking_mode,
       defaultRestSeconds: row.default_rest_seconds,
       isCustom: row.is_custom,
@@ -223,9 +233,11 @@ const syncEntityConfigs = {
       user_id: userId,
       template_exercise_id: record.templateExerciseId,
       sort_order: record.sortOrder,
+      set_kind: record.setKind,
       target_reps: record.targetReps,
       target_weight: record.targetWeight,
       target_assistance_weight: record.targetAssistanceWeight,
+      target_duration_seconds: record.targetDurationSeconds,
       deleted_at: record.deletedAt,
       created_at: record.createdAt,
       updated_at: record.updatedAt,
@@ -234,9 +246,11 @@ const syncEntityConfigs = {
       id: row.id,
       templateExerciseId: row.template_exercise_id,
       sortOrder: row.sort_order,
+      setKind: row.set_kind,
       targetReps: row.target_reps,
       targetWeight: row.target_weight,
       targetAssistanceWeight: row.target_assistance_weight,
+      targetDurationSeconds: row.target_duration_seconds,
       deletedAt: row.deleted_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -253,6 +267,8 @@ const syncEntityConfigs = {
       user_id: userId,
       template_id: record.templateId,
       name: record.name,
+      notes: record.notes,
+      calories_burned: record.caloriesBurned,
       status: record.status,
       started_at: record.startedAt,
       ended_at: record.endedAt,
@@ -264,6 +280,8 @@ const syncEntityConfigs = {
       id: row.id,
       templateId: row.template_id,
       name: row.name,
+      notes: row.notes,
+      caloriesBurned: row.calories_burned,
       status: row.status,
       startedAt: row.started_at,
       endedAt: row.ended_at,
@@ -283,6 +301,7 @@ const syncEntityConfigs = {
       user_id: userId,
       workout_id: record.workoutId,
       exercise_id: record.exerciseId,
+      notes: record.notes,
       sort_order: record.sortOrder,
       deleted_at: record.deletedAt,
       created_at: record.createdAt,
@@ -292,6 +311,7 @@ const syncEntityConfigs = {
       id: row.id,
       workoutId: row.workout_id,
       exerciseId: row.exercise_id,
+      notes: row.notes,
       sortOrder: row.sort_order,
       deletedAt: row.deleted_at,
       createdAt: row.created_at,
@@ -310,9 +330,11 @@ const syncEntityConfigs = {
       workout_exercise_id: record.workoutExerciseId,
       planned_set_id: record.plannedSetId,
       sort_order: record.sortOrder,
+      set_kind: record.setKind,
       reps: record.reps,
       weight: record.weight,
       assistance_weight: record.assistanceWeight,
+      duration_seconds: record.durationSeconds,
       completed_at: record.completedAt,
       deleted_at: record.deletedAt,
       created_at: record.createdAt,
@@ -323,9 +345,11 @@ const syncEntityConfigs = {
       workoutExerciseId: row.workout_exercise_id,
       plannedSetId: row.planned_set_id,
       sortOrder: row.sort_order,
+      setKind: row.set_kind,
       reps: row.reps,
       weight: row.weight,
       assistanceWeight: row.assistance_weight,
+      durationSeconds: row.duration_seconds,
       completedAt: row.completed_at,
       deletedAt: row.deleted_at,
       createdAt: row.created_at,

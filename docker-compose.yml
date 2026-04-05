@@ -1,0 +1,23 @@
+services:
+  supabase-bootstrap:
+    image: postgres:16-alpine
+    environment:
+      SUPABASE_DB_URL: ${SUPABASE_DB_URL:-}
+    volumes:
+      - ./supabase/schema.sql:/schema/schema.sql:ro
+      - ./docker/bootstrap-supabase-schema.sh:/bootstrap.sh:ro
+    entrypoint: ["/bin/sh", "/bootstrap.sh"]
+    restart: "no"
+
+  stronk:
+    build:
+      context: .
+    depends_on:
+      supabase-bootstrap:
+        condition: service_completed_successfully
+    ports:
+      - "4173:80"
+    environment:
+      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
+      VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
+    restart: unless-stopped

@@ -1,0 +1,4 @@
+window.__STRONK_CONFIG__ = {
+  supabaseUrl: "${VITE_SUPABASE_URL}",
+  supabaseAnonKey: "${VITE_SUPABASE_ANON_KEY}"
+}

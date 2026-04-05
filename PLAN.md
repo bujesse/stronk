@@ -11,9 +11,11 @@
 
 - Exercise library with seeded defaults and custom exercises.
 - Hierarchical muscle targeting metadata on exercises (`Body Region > Muscle Group`) for future training suggestions.
-- Exercise-specific tracking modes for standard load, bodyweight-only, and assisted bodyweight movements.
+- Exercise-specific tracking modes for standard load, bodyweight-only, assisted bodyweight, and duration-based work such as cardio.
 - Workout templates with ordered exercises and planned sets.
+- Workout templates with ordered exercises and planned sets, including warmup sets.
 - Active workout logging with reps, load/assistance fields as appropriate, and completion state.
+- Workout-level session notes, plus exercise-specific notes inside each logged movement, each with recent-note recall and browsable history.
 - Rest timer tied to set completion.
 - Workout history and basic progression analytics.
 - PWA installability and offline app shell caching.
@@ -31,27 +33,30 @@
 - Local data: Dexie over IndexedDB as the authoritative client store.
 - Sync: optional Supabase Auth + Postgres sync adapter behind a repository/sync layer.
 - PWA: Vite PWA plugin with cached shell and manifest.
+- Deployment: Dockerized static build served by nginx, with runtime config injection for Supabase env vars.
 - Design: mobile-first single-app shell with bottom navigation and persistent active workout surface.
 
 ## Domain Model
 
-- `exercise` with `bodyRegion`, `muscleGroup`, and `trackingMode`
+- `exercise` with `bodyRegion`, `muscleGroup`, `trackingMode`, and default rest
 - `workoutTemplate`
 - `templateExercise`
-- `templateSet` with mode-specific target fields
-- `workout`
-- `workoutExercise`
-- `loggedSet` with canonical stored load plus assistance where relevant
+- `templateSet` with `setKind` plus mode-specific target fields
+- `workout` with workout-level notes
+- `workoutExercise` with exercise-specific notes inside a workout
+- `loggedSet` with `setKind` and canonical stored load/time fields as relevant
 - `preferences`
 - `syncQueueItem`
 
 ## Tracking Rules
 
-- Supported v1 exercise tracking modes are `weight_reps`, `bodyweight_reps`, and `assisted_bodyweight_reps`.
+- Supported v1 exercise tracking modes are `weight_reps`, `bodyweight_reps`, `assisted_bodyweight_reps`, and `duration`.
 - Weight-like values are stored in a canonical internal unit and converted only at input/output boundaries.
 - `bodyweight_reps` exercises track reps without a required load field.
 - `assisted_bodyweight_reps` exercises track assistance separately; do not model assistance as negative load.
+- `duration` exercises store time in seconds internally and render as minutes/seconds in the UI.
 - Analytics are mode-specific: load PRs for standard lifts, reps PRs for bodyweight movements, and least-assistance progression for assisted movements.
+- Warmup sets are logged and preserved, but excluded from progression analytics and PR calculations.
 
 ## Exercise Taxonomy
 
@@ -71,6 +76,12 @@
 - Sync tables in Supabase use snake_case columns with per-user row ownership enforced by RLS.
 - Preferences sync only the shared fields (`weightUnit`, `defaultRestSeconds`); active rest timers remain device-local.
 - If Supabase is not configured, the app remains fully local.
+
+## Prelaunch Data Policy
+
+- The app is prelaunch and does not preserve local data across schema changes.
+- Dexie schema upgrades should reset local IndexedDB state and reseed defaults instead of carrying migration logic.
+- Do not add backward-compatibility transforms for old local schemas unless explicitly requested later.
 
 ## Milestones
 

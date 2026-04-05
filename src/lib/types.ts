@@ -13,13 +13,16 @@ export type TrackingMode =
   | 'weight_reps'
   | 'bodyweight_reps'
   | 'assisted_bodyweight_reps'
+  | 'duration'
+export type SetKind = 'normal' | 'warmup'
 
 export interface Exercise {
   id: string
-  name: string
+  movementName: string
   bodyRegion: BodyRegion | null
   muscleGroup: string | null
   equipment: string | null
+  preferredWeightUnit: WeightUnit | null
   trackingMode: TrackingMode
   defaultRestSeconds: number | null
   isCustom: boolean
@@ -54,9 +57,11 @@ export interface TemplateSet {
   id: string
   templateExerciseId: string
   sortOrder: number
+  setKind: SetKind
   targetReps: number | null
   targetWeight: number | null
   targetAssistanceWeight: number | null
+  targetDurationSeconds: number | null
   deletedAt: string | null
   createdAt: string
   updatedAt: string
@@ -67,6 +72,8 @@ export interface Workout {
   id: string
   templateId: string | null
   name: string
+  notes: string
+  caloriesBurned: number | null
   status: 'active' | 'completed'
   startedAt: string
   endedAt: string | null
@@ -80,6 +87,7 @@ export interface WorkoutExercise {
   id: string
   workoutId: string
   exerciseId: string
+  notes: string
   sortOrder: number
   deletedAt: string | null
   createdAt: string
@@ -92,9 +100,11 @@ export interface LoggedSet {
   workoutExerciseId: string
   plannedSetId: string | null
   sortOrder: number
+  setKind: SetKind
   reps: number | null
   weight: number | null
   assistanceWeight: number | null
+  durationSeconds: number | null
   completedAt: string | null
   deletedAt: string | null
   createdAt: string
@@ -108,6 +118,24 @@ export interface Preferences {
   defaultRestSeconds: number
   activeTimerEndAt: string | null
   updatedAt: string
+}
+
+export interface Profile {
+  id: 'profile'
+  heightCm: number | null
+  targetBodyWeightKg: number | null
+  updatedAt: string
+  syncStatus: SyncStatus
+}
+
+export interface BodyWeightEntry {
+  id: string
+  weightKg: number
+  recordedAt: string
+  deletedAt: string | null
+  createdAt: string
+  updatedAt: string
+  syncStatus: SyncStatus
 }
 
 export interface AuthSessionInfo {
@@ -128,9 +156,11 @@ export interface SyncQueueItem {
 }
 
 export interface TemplateSetDraft {
+  setKind: SetKind
   reps: string
   weight: string
   assistanceWeight: string
+  durationMinutes: string
 }
 
 export interface TemplateExerciseWithSets {
@@ -155,17 +185,43 @@ export interface WorkoutWithDetails {
   items: WorkoutExerciseWithSets[]
 }
 
+export interface WorkoutNoteEntry {
+  workoutId: string
+  workoutName: string
+  note: string
+  startedAt: string
+  endedAt: string | null
+}
+
+export interface ExerciseNoteEntry {
+  workoutExerciseId: string
+  workoutId: string
+  exerciseId: string
+  exerciseName: string
+  workoutName: string
+  note: string
+  startedAt: string
+  endedAt: string | null
+}
+
 export interface ExerciseAnalytics {
   exerciseId: string
   exerciseName: string
+  preferredWeightUnit: WeightUnit | null
   trackingMode: TrackingMode
   latestWeight: number | null
   latestReps: number | null
   latestAssistanceWeight: number | null
+  latestDurationSeconds: number | null
   personalBestWeight: number | null
+  estimatedOneRepMax: number | null
   personalBestReps: number | null
   leastAssistanceWeight: number | null
-  personalBestVolume: number | null
+  longestDurationSeconds: number | null
+  personalBestSetVolume: number | null
+  personalBestSessionVolume: number | null
+  personalBestSessionReps: number | null
+  personalBestSessionDurationSeconds: number | null
   totalSessions: number
   points: Array<{
     workoutDate: string

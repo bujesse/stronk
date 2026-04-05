@@ -1,7 +1,14 @@
 import { useMemo, useState } from 'react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { DropdownField } from '../../components/DropdownField'
 import { SectionCard } from '../../components/SectionCard'
-import { getExerciseTrackingMode, pluralize } from '../../lib/format'
+import { useAnimatedList } from '../../hooks/useAnimatedList'
+import {
+  formatExerciseName,
+  getExerciseDisplayWeightUnit,
+  getExerciseTrackingMode,
+  pluralize,
+} from '../../lib/format'
 import type {
   Exercise,
   TemplateSetDraft,
@@ -22,7 +29,13 @@ interface TemplatesScreenProps {
   onStartTemplate: (templateId: string) => void
 }
 
-const emptySet = (): TemplateSetDraft => ({ reps: '', weight: '', assistanceWeight: '' })
+const emptySet = (): TemplateSetDraft => ({
+  setKind: 'normal',
+  reps: '',
+  weight: '',
+  assistanceWeight: '',
+  durationMinutes: '',
+})
 
 export function TemplatesScreen({
   exercises,
@@ -31,6 +44,7 @@ export function TemplatesScreen({
   onCreateTemplate,
   onStartTemplate,
 }: TemplatesScreenProps) {
+  const [exerciseListRef] = useAnimatedList()
   const [name, setName] = useState('')
   const [notes, setNotes] = useState('')
   const [selectedExerciseIds, setSelectedExerciseIds] = useState<string[]>([])
@@ -45,7 +59,7 @@ export function TemplatesScreen({
     setSelectedExerciseIds((current) => [...current, exerciseId])
     setSetDrafts((current) => ({
       ...current,
-      [exerciseId]: current[exerciseId] ?? [emptySet(), emptySet(), emptySet()],
+      [exerciseId]: current[exerciseId] ?? [emptySet()],
     }))
   }
 
@@ -68,6 +82,24 @@ export function TemplatesScreen({
       ...current,
       [exerciseId]: [...(current[exerciseId] ?? []), emptySet()],
     }))
+  }
+
+  function moveExercise(exerciseId: string, direction: 'up' | 'down') {
+    setSelectedExerciseIds((current) => {
+      const next = [...current]
+      const currentIndex = next.findIndex((id) => id === exerciseId)
+      if (currentIndex < 0) {
+        return current
+      }
+
+      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+      if (targetIndex < 0 || targetIndex >= next.length) {
+        return current
+      }
+
+      ;[next[currentIndex], next[targetIndex]] = [next[targetIndex], next[currentIndex]]
+      return next
+    })
   }
 
   async function submit() {
@@ -106,14 +138,14 @@ export function TemplatesScreen({
               placeholder="Add exercise"
               options={availableExercises.map((exercise) => ({
                 value: exercise.id,
-                label: exercise.name,
+                label: formatExerciseName(exercise),
               }))}
               onChange={addExercise}
             />
           ) : null}
         </div>
 
-        <div className="stack compact">
+        <div className="stack compact" ref={exerciseListRef}>
           {selectedExerciseIds.map((exerciseId) => {
             const exercise = exercises.find((entry) => entry.id === exerciseId)
             if (!exercise) {
@@ -123,45 +155,19 @@ export function TemplatesScreen({
             const trackingMode = getExerciseTrackingMode(exercise)
 
             return (
-              <div className="embedded-card" key={exerciseId}>
-                <div className="section-header">
-                  <strong>{exercise.name}</strong>
-                  <button className="ghost-button" onClick={() => addSet(exerciseId)}>
-                    Add set
-                  </button>
-                </div>
-                <div className="set-grid">
-                  {(setDrafts[exerciseId] ?? []).map((draft, index) => (
-                    <div className="set-row" key={`${exerciseId}-${index}`}>
-                      <span>Set {index + 1}</span>
-                      <input
-                        value={draft.reps}
-                        onChange={(event) => updateDraft(exerciseId, index, 'reps', event.target.value)}
-                        placeholder="Reps"
-                        inputMode="numeric"
-                      />
-                      {trackingMode === 'weight_reps' ? (
-                        <input
-                          value={draft.weight}
-                          onChange={(event) => updateDraft(exerciseId, index, 'weight', event.target.value)}
-                          placeholder={`Weight (${weightUnit})`}
-                          inputMode="decimal"
-                        />
-                      ) : null}
-                      {trackingMode === 'assisted_bodyweight_reps' ? (
-                        <input
-                          value={draft.assistanceWeight}
-                          onChange={(event) =>
-                            updateDraft(exerciseId, index, 'assistanceWeight', event.target.value)
-                          }
-                          placeholder={`Assist (${weightUnit})`}
-                          inputMode="decimal"
-                        />
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <TemplateExerciseCard
+                key={exerciseId}
+                exercise={exercise}
+                exerciseId={exerciseId}
+                trackingMode={trackingMode}
+                drafts={setDrafts[exerciseId] ?? []}
+                weightUnit={weightUnit}
+                onAddSet={addSet}
+                onUpdateDraft={updateDraft}
+                onMoveExercise={moveExercise}
+                isFirst={selectedExerciseIds[0] === exerciseId}
+                isLast={selectedExerciseIds[selectedExerciseIds.length - 1] === exerciseId}
+              />
             )
           })}
         </div>
@@ -187,6 +193,132 @@ export function TemplatesScreen({
           {templates.length === 0 ? <p className="empty-state">No templates yet.</p> : null}
         </div>
       </SectionCard>
+    </div>
+  )
+}
+
+interface TemplateExerciseCardProps {
+  exercise: Exercise
+  exerciseId: string
+  trackingMode: ReturnType<typeof getExerciseTrackingMode>
+  drafts: TemplateSetDraft[]
+  weightUnit: WeightUnit
+  onAddSet: (exerciseId: string) => void
+  onMoveExercise: (exerciseId: string, direction: 'up' | 'down') => void
+  isFirst: boolean
+  isLast: boolean
+  onUpdateDraft: (
+    exerciseId: string,
+    index: number,
+    field: keyof TemplateSetDraft,
+    value: string,
+  ) => void
+}
+
+function TemplateExerciseCard({
+  exercise,
+  exerciseId,
+  trackingMode,
+  drafts,
+  weightUnit,
+  onAddSet,
+  onMoveExercise,
+  isFirst,
+  isLast,
+  onUpdateDraft,
+}: TemplateExerciseCardProps) {
+  const [setGridRef] = useAnimatedList()
+  const displayWeightUnit = getExerciseDisplayWeightUnit(exercise, weightUnit)
+
+  return (
+    <div className="embedded-card">
+      <div className="section-header">
+        <strong>{formatExerciseName(exercise)}</strong>
+        <div className="section-actions">
+          <button
+            className="ghost-button compact-icon-button"
+            onClick={() => onMoveExercise(exerciseId, 'up')}
+            disabled={isFirst}
+            type="button"
+            aria-label={`Move ${formatExerciseName(exercise)} up`}
+            title="Move up"
+          >
+            <ChevronUp size={16} strokeWidth={2.2} />
+          </button>
+          <button
+            className="ghost-button compact-icon-button"
+            onClick={() => onMoveExercise(exerciseId, 'down')}
+            disabled={isLast}
+            type="button"
+            aria-label={`Move ${formatExerciseName(exercise)} down`}
+            title="Move down"
+          >
+            <ChevronDown size={16} strokeWidth={2.2} />
+          </button>
+          <button className="ghost-button" onClick={() => onAddSet(exerciseId)}>
+            Add set
+          </button>
+        </div>
+      </div>
+      <div className="set-grid" ref={setGridRef}>
+        {drafts.map((draft, index) => (
+          <div className="set-row template-set-row" key={`${exerciseId}-${index}`}>
+            <span>Set {index + 1}</span>
+            <button
+              className={draft.setKind === 'warmup' ? 'chip-button active warmup-toggle' : 'chip-button warmup-toggle'}
+              onClick={() =>
+                onUpdateDraft(
+                  exerciseId,
+                  index,
+                  'setKind',
+                  draft.setKind === 'warmup' ? 'normal' : 'warmup',
+                )
+              }
+              type="button"
+              aria-label={draft.setKind === 'warmup' ? 'Mark as working set' : 'Mark as warm-up set'}
+              title={draft.setKind === 'warmup' ? 'Warm-up set' : 'Mark warm-up'}
+            >
+              WU
+            </button>
+            {trackingMode !== 'duration' ? (
+              <input
+                value={draft.reps}
+                onChange={(event) => onUpdateDraft(exerciseId, index, 'reps', event.target.value)}
+                placeholder="Reps"
+                inputMode="numeric"
+              />
+            ) : null}
+            {trackingMode === 'duration' ? (
+              <input
+                value={draft.durationMinutes}
+                onChange={(event) =>
+                  onUpdateDraft(exerciseId, index, 'durationMinutes', event.target.value)
+                }
+                placeholder="Minutes"
+                inputMode="decimal"
+              />
+            ) : null}
+            {trackingMode === 'weight_reps' ? (
+              <input
+                value={draft.weight}
+                onChange={(event) => onUpdateDraft(exerciseId, index, 'weight', event.target.value)}
+                placeholder={`Weight (${displayWeightUnit})`}
+                inputMode="decimal"
+              />
+            ) : null}
+            {trackingMode === 'assisted_bodyweight_reps' ? (
+              <input
+                value={draft.assistanceWeight}
+                onChange={(event) =>
+                  onUpdateDraft(exerciseId, index, 'assistanceWeight', event.target.value)
+                }
+                placeholder={`Assist (${displayWeightUnit})`}
+                inputMode="decimal"
+              />
+            ) : null}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

@@ -2,9 +2,10 @@ import { db } from './appDb'
 import { createId } from '../lib/id'
 import { nowIso } from '../lib/time'
 import { buildExerciseAnalytics } from '../lib/analytics'
-import { getExerciseTrackingMode, toStorageWeight } from '../lib/format'
+import { formatExerciseName, getExerciseTrackingMode, toStorageWeight } from '../lib/format'
 import type {
   BodyRegion,
+  ExerciseNoteEntry,
   ExerciseAnalytics,
   LoggedSet,
   Preferences,
@@ -14,6 +15,7 @@ import type {
   TemplateSet,
   TemplateWithDetails,
   Workout,
+  WorkoutNoteEntry,
   WorkoutExercise,
   WorkoutTemplate,
   WorkoutWithDetails,
@@ -43,6 +45,11 @@ async function getWeightUnit() {
   return preferences?.weightUnit ?? 'lb'
 }
 
+async function getExerciseWeightUnit(exerciseId: string) {
+  const [exercise, fallbackUnit] = await Promise.all([db.exercises.get(exerciseId), getWeightUnit()])
+  return exercise?.preferredWeightUnit ?? fallbackUnit
+}
+
 export async function savePreferences(updates: Partial<Preferences>) {
   const current = await db.preferences.get('preferences')
   if (!current) {
@@ -69,20 +76,22 @@ export async function savePreferences(updates: Partial<Preferences>) {
 }
 
 export async function createExercise(input: {
-  name: string
+  movementName: string
   bodyRegion?: BodyRegion | null
   muscleGroup?: string
   equipment?: string
+  preferredWeightUnit?: Preferences['weightUnit'] | null
   trackingMode: TrackingMode
   defaultRestSeconds?: number | null
 }) {
   const timestamp = nowIso()
   const exercise = {
     id: createId('exercise'),
-    name: input.name.trim(),
+    movementName: input.movementName.trim(),
     bodyRegion: input.bodyRegion ?? null,
     muscleGroup: input.muscleGroup?.trim() || null,
     equipment: input.equipment?.trim() || null,
+    preferredWeightUnit: input.preferredWeightUnit ?? null,
     trackingMode: input.trackingMode,
     defaultRestSeconds: input.defaultRestSeconds ?? null,
     isCustom: true,
@@ -97,10 +106,45 @@ export async function createExercise(input: {
   return exercise
 }
 
+export async function updateExercise(
+  exerciseId: string,
+  updates: {
+    movementName: string
+    bodyRegion?: BodyRegion | null
+    muscleGroup?: string
+    equipment?: string
+    preferredWeightUnit?: Preferences['weightUnit'] | null
+    trackingMode: TrackingMode
+    defaultRestSeconds?: number | null
+  },
+) {
+  const current = await db.exercises.get(exerciseId)
+  if (!current) {
+    return null
+  }
+
+  const next = {
+    ...current,
+    movementName: updates.movementName.trim(),
+    bodyRegion: updates.bodyRegion ?? null,
+    muscleGroup: updates.muscleGroup?.trim() || null,
+    equipment: updates.equipment?.trim() || null,
+    preferredWeightUnit: updates.preferredWeightUnit ?? null,
+    trackingMode: updates.trackingMode,
+    defaultRestSeconds: updates.defaultRestSeconds ?? null,
+    updatedAt: nowIso(),
+    syncStatus: 'pending' as const,
+  }
+
+  await db.exercises.put(next)
+  await queue('exercise', next.id, 'upsert', next)
+  return next
+}
+
 export async function listExercises() {
   return (await db.exercises.toArray())
     .filter((exercise) => exercise.deletedAt == null)
-    .sort((left, right) => left.name.localeCompare(right.name))
+    .sort((left, right) => formatExerciseName(left).localeCompare(formatExerciseName(right)))
 }
 
 export async function createTemplate(input: {
@@ -111,8 +155,6 @@ export async function createTemplate(input: {
 }) {
   const timestamp = nowIso()
   const templateId = createId('template')
-  const weightUnit = await getWeightUnit()
-
   await db.transaction(
     'rw',
     [db.workoutTemplates, db.templateExercises, db.templateSets, db.syncQueue],
@@ -133,6 +175,7 @@ export async function createTemplate(input: {
       for (const [index, exerciseId] of input.exerciseIds.entries()) {
         const exercise = await db.exercises.get(exerciseId)
         const trackingMode = exercise ? getExerciseTrackingMode(exercise) : 'weight_reps'
+        const weightUnit = exercise?.preferredWeightUnit ?? (await getWeightUnit())
         const templateExercise: TemplateExercise = {
           id: createId('templateExercise'),
           templateId,
@@ -153,6 +196,7 @@ export async function createTemplate(input: {
             id: createId('templateSet'),
             templateExerciseId: templateExercise.id,
             sortOrder: setIndex,
+            setKind: draft.setKind,
             targetReps: draft.reps ? Number(draft.reps) : null,
             targetWeight:
               trackingMode === 'weight_reps' && draft.weight
@@ -161,6 +205,10 @@ export async function createTemplate(input: {
             targetAssistanceWeight:
               trackingMode === 'assisted_bodyweight_reps' && draft.assistanceWeight
                 ? toStorageWeight(Number(draft.assistanceWeight), weightUnit)
+                : null,
+            targetDurationSeconds:
+              trackingMode === 'duration' && draft.durationMinutes
+                ? Math.round(Number(draft.durationMinutes) * 60)
                 : null,
             deletedAt: null,
             createdAt: timestamp,
@@ -226,6 +274,8 @@ export async function startWorkoutFromTemplate(templateId: string) {
         id: workoutId,
         templateId: template.id,
         name: template.name,
+        notes: '',
+        caloriesBurned: null,
         status: 'active' as const,
         startedAt: timestamp,
         endedAt: null,
@@ -243,6 +293,7 @@ export async function startWorkoutFromTemplate(templateId: string) {
           id: createId('workoutExercise'),
           workoutId,
           exerciseId: templateExercise.exerciseId,
+          notes: '',
           sortOrder: index,
           deletedAt: null,
           createdAt: timestamp,
@@ -263,9 +314,11 @@ export async function startWorkoutFromTemplate(templateId: string) {
             workoutExerciseId: workoutExercise.id,
             plannedSetId: set.id,
             sortOrder: setIndex,
+            setKind: set.setKind,
             reps: set.targetReps,
             weight: set.targetWeight,
             assistanceWeight: set.targetAssistanceWeight,
+            durationSeconds: set.targetDurationSeconds,
             completedAt: null,
             deletedAt: null,
             createdAt: timestamp,
@@ -295,6 +348,8 @@ export async function createQuickWorkout(name: string, exerciseIds: string[]) {
         id: workoutId,
         templateId: null,
         name: name.trim() || 'Quick workout',
+        notes: '',
+        caloriesBurned: null,
         status: 'active' as const,
         startedAt: timestamp,
         endedAt: null,
@@ -311,6 +366,7 @@ export async function createQuickWorkout(name: string, exerciseIds: string[]) {
           id: createId('workoutExercise'),
           workoutId,
           exerciseId,
+          notes: '',
           sortOrder: index,
           deletedAt: null,
           createdAt: timestamp,
@@ -320,15 +376,17 @@ export async function createQuickWorkout(name: string, exerciseIds: string[]) {
         await db.workoutExercises.put(workoutExercise)
         await queue('workoutExercise', workoutExercise.id, 'upsert', workoutExercise)
 
-        for (let setIndex = 0; setIndex < 3; setIndex += 1) {
+        for (let setIndex = 0; setIndex < 1; setIndex += 1) {
           const loggedSet: LoggedSet = {
             id: createId('loggedSet'),
             workoutExerciseId: workoutExercise.id,
             plannedSetId: null,
             sortOrder: setIndex,
+            setKind: 'normal',
             reps: null,
             weight: null,
             assistanceWeight: null,
+            durationSeconds: null,
             completedAt: null,
             deletedAt: null,
             createdAt: timestamp,
@@ -352,6 +410,10 @@ export async function getActiveWorkout(): Promise<WorkoutWithDetails | null> {
     return null
   }
 
+  return buildWorkoutWithDetails(workout)
+}
+
+async function buildWorkoutWithDetails(workout: Workout): Promise<WorkoutWithDetails> {
   const workoutExercises = (await db.workoutExercises.where({ workoutId: workout.id }).toArray())
     .filter((item) => item.deletedAt == null)
     .sort((left, right) => left.sortOrder - right.sortOrder)
@@ -366,8 +428,17 @@ export async function getActiveWorkout(): Promise<WorkoutWithDetails | null> {
       sets: loggedSets
         .filter((set) => set.workoutExerciseId === workoutExercise.id)
         .sort((left, right) => left.sortOrder - right.sortOrder),
-    })),
+      })),
   }
+}
+
+export async function getWorkoutById(workoutId: string): Promise<WorkoutWithDetails | null> {
+  const workout = await db.workouts.get(workoutId)
+  if (!workout || workout.deletedAt != null || workout.status !== 'completed') {
+    return null
+  }
+
+  return buildWorkoutWithDetails(workout)
 }
 
 export async function listWorkoutHistory(limit = 12): Promise<WorkoutWithDetails[]> {
@@ -379,34 +450,24 @@ export async function listWorkoutHistory(limit = 12): Promise<WorkoutWithDetails
         new Date(left.endedAt ?? left.startedAt).getTime(),
     )
     .slice(0, limit)
-  const workoutExercises = (await db.workoutExercises.toArray()).filter((item) => item.deletedAt == null)
-  const loggedSets = (await db.loggedSets.toArray()).filter((item) => item.deletedAt == null)
-  const exercises = (await db.exercises.toArray()).filter((item) => item.deletedAt == null)
-
-  return workouts.map((workout) => ({
-    workout,
-    items: workoutExercises
-      .filter((entry) => entry.workoutId === workout.id)
-      .sort((left, right) => left.sortOrder - right.sortOrder)
-      .map((entry) => ({
-        workoutExercise: entry,
-        exercise: exercises.find((exercise) => exercise.id === entry.exerciseId)!,
-        sets: loggedSets
-          .filter((set) => set.workoutExerciseId === entry.id)
-          .sort((left, right) => left.sortOrder - right.sortOrder),
-      })),
-  }))
+  return Promise.all(workouts.map((workout) => buildWorkoutWithDetails(workout)))
 }
 
 export async function updateLoggedSet(
   loggedSetId: string,
-  updates: Partial<Pick<LoggedSet, 'reps' | 'weight' | 'assistanceWeight' | 'completedAt'>>,
+  updates: Partial<
+    Pick<
+      LoggedSet,
+      'reps' | 'weight' | 'assistanceWeight' | 'durationSeconds' | 'completedAt' | 'setKind'
+    >
+  >,
 ) {
   const current = await db.loggedSets.get(loggedSetId)
   if (!current) {
     return
   }
-  const weightUnit = await getWeightUnit()
+  const workoutExercise = await db.workoutExercises.get(current.workoutExerciseId)
+  const weightUnit = workoutExercise ? await getExerciseWeightUnit(workoutExercise.exerciseId) : await getWeightUnit()
 
   const next: LoggedSet = {
     ...current,
@@ -417,6 +478,8 @@ export async function updateLoggedSet(
       updates.assistanceWeight === undefined
         ? current.assistanceWeight
         : toStorageWeight(updates.assistanceWeight, weightUnit),
+    durationSeconds:
+      updates.durationSeconds === undefined ? current.durationSeconds : updates.durationSeconds,
     updatedAt: nowIso(),
     syncStatus: 'pending',
   }
@@ -425,7 +488,6 @@ export async function updateLoggedSet(
   await queue('loggedSet', next.id, 'upsert', next)
 
   if (updates.completedAt) {
-    const workoutExercise = await db.workoutExercises.get(current.workoutExerciseId)
     const exercise = workoutExercise ? await db.exercises.get(workoutExercise.exerciseId) : null
     const preferences = await getPreferences()
     const restSeconds =
@@ -435,6 +497,40 @@ export async function updateLoggedSet(
       activeTimerEndAt: new Date(Date.now() + restSeconds * 1000).toISOString(),
     })
   }
+}
+
+export async function updateWorkoutNotes(workoutId: string, notes: string) {
+  const current = await db.workouts.get(workoutId)
+  if (!current) {
+    return
+  }
+
+  const next: Workout = {
+    ...current,
+    notes: notes.trim(),
+    updatedAt: nowIso(),
+    syncStatus: 'pending',
+  }
+
+  await db.workouts.put(next)
+  await queue('workout', next.id, 'upsert', next)
+}
+
+export async function updateWorkoutExerciseNotes(workoutExerciseId: string, notes: string) {
+  const current = await db.workoutExercises.get(workoutExerciseId)
+  if (!current) {
+    return
+  }
+
+  const next: WorkoutExercise = {
+    ...current,
+    notes: notes.trim(),
+    updatedAt: nowIso(),
+    syncStatus: 'pending',
+  }
+
+  await db.workoutExercises.put(next)
+  await queue('workoutExercise', next.id, 'upsert', next)
 }
 
 export async function addSetToWorkoutExercise(workoutExerciseId: string) {
@@ -447,9 +543,11 @@ export async function addSetToWorkoutExercise(workoutExerciseId: string) {
     workoutExerciseId,
     plannedSetId: null,
     sortOrder: sets.length,
+    setKind: 'normal',
     reps: null,
     weight: null,
     assistanceWeight: null,
+    durationSeconds: null,
     completedAt: null,
     deletedAt: null,
     createdAt: timestamp,
@@ -459,6 +557,95 @@ export async function addSetToWorkoutExercise(workoutExerciseId: string) {
 
   await db.loggedSets.put(next)
   await queue('loggedSet', next.id, 'upsert', next)
+}
+
+export async function duplicateSetInWorkout(setId: string) {
+  const current = await db.loggedSets.get(setId)
+  if (!current || current.deletedAt != null) {
+    return
+  }
+
+  const siblingSets = (await db.loggedSets.where({ workoutExerciseId: current.workoutExerciseId }).toArray())
+    .filter((set) => set.deletedAt == null)
+    .sort((left, right) => left.sortOrder - right.sortOrder)
+
+  const insertionIndex = siblingSets.findIndex((set) => set.id === setId)
+  const nextSortOrder = insertionIndex >= 0 ? siblingSets[insertionIndex].sortOrder + 1 : siblingSets.length
+  const timestamp = nowIso()
+
+  await db.transaction('rw', [db.loggedSets, db.syncQueue], async () => {
+    for (const set of siblingSets) {
+      if (set.sortOrder < nextSortOrder) {
+        continue
+      }
+
+      const shifted: LoggedSet = {
+        ...set,
+        sortOrder: set.sortOrder + 1,
+        updatedAt: timestamp,
+        syncStatus: 'pending',
+      }
+
+      await db.loggedSets.put(shifted)
+      await queue('loggedSet', shifted.id, 'upsert', shifted)
+    }
+
+    const duplicate: LoggedSet = {
+      ...current,
+      id: createId('loggedSet'),
+      sortOrder: nextSortOrder,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      syncStatus: 'pending',
+    }
+
+    await db.loggedSets.put(duplicate)
+    await queue('loggedSet', duplicate.id, 'upsert', duplicate)
+  })
+}
+
+export async function moveExerciseInWorkout(workoutExerciseId: string, direction: 'up' | 'down') {
+  const current = await db.workoutExercises.get(workoutExerciseId)
+  if (!current || current.deletedAt != null) {
+    return
+  }
+
+  const siblingExercises = (await db.workoutExercises.where({ workoutId: current.workoutId }).toArray())
+    .filter((item) => item.deletedAt == null)
+    .sort((left, right) => left.sortOrder - right.sortOrder)
+
+  const currentIndex = siblingExercises.findIndex((item) => item.id === workoutExerciseId)
+  if (currentIndex < 0) {
+    return
+  }
+
+  const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+  if (targetIndex < 0 || targetIndex >= siblingExercises.length) {
+    return
+  }
+
+  const target = siblingExercises[targetIndex]
+  const timestamp = nowIso()
+
+  await db.transaction('rw', [db.workoutExercises, db.syncQueue], async () => {
+    const movedCurrent: WorkoutExercise = {
+      ...current,
+      sortOrder: target.sortOrder,
+      updatedAt: timestamp,
+      syncStatus: 'pending',
+    }
+    const movedTarget: WorkoutExercise = {
+      ...target,
+      sortOrder: current.sortOrder,
+      updatedAt: timestamp,
+      syncStatus: 'pending',
+    }
+
+    await db.workoutExercises.put(movedCurrent)
+    await queue('workoutExercise', movedCurrent.id, 'upsert', movedCurrent)
+    await db.workoutExercises.put(movedTarget)
+    await queue('workoutExercise', movedTarget.id, 'upsert', movedTarget)
+  })
 }
 
 export async function removeSetFromWorkout(setId: string) {
@@ -488,6 +675,7 @@ export async function addExerciseToWorkout(workoutId: string, exerciseId: string
     id: createId('workoutExercise'),
     workoutId,
     exerciseId,
+    notes: '',
     sortOrder: workoutExercises.length,
     deletedAt: null,
     createdAt: timestamp,
@@ -498,15 +686,17 @@ export async function addExerciseToWorkout(workoutId: string, exerciseId: string
   await db.workoutExercises.put(workoutExercise)
   await queue('workoutExercise', workoutExercise.id, 'upsert', workoutExercise)
 
-  for (let setIndex = 0; setIndex < 3; setIndex += 1) {
+  for (let setIndex = 0; setIndex < 1; setIndex += 1) {
     const loggedSet: LoggedSet = {
       id: createId('loggedSet'),
       workoutExerciseId: workoutExercise.id,
       plannedSetId: null,
       sortOrder: setIndex,
+      setKind: 'normal',
       reps: null,
       weight: null,
       assistanceWeight: null,
+      durationSeconds: null,
       completedAt: null,
       deletedAt: null,
       createdAt: timestamp,
@@ -517,6 +707,67 @@ export async function addExerciseToWorkout(workoutId: string, exerciseId: string
     await db.loggedSets.put(loggedSet)
     await queue('loggedSet', loggedSet.id, 'upsert', loggedSet)
   }
+}
+
+export async function listExerciseNoteHistoryForWorkout(
+  workoutId: string,
+): Promise<Record<string, ExerciseNoteEntry[]>> {
+  const [currentWorkoutExercises, workouts, allWorkoutExercises, exercises] = await Promise.all([
+    db.workoutExercises.where({ workoutId }).toArray(),
+    db.workouts.toArray(),
+    db.workoutExercises.toArray(),
+    db.exercises.toArray(),
+  ])
+
+  const completedWorkoutMap = new Map(
+    workouts
+      .filter((workout) => workout.deletedAt == null && workout.status === 'completed')
+      .map((workout) => [workout.id, workout]),
+  )
+  const exerciseMap = new Map(
+    exercises.filter((exercise) => exercise.deletedAt == null).map((exercise) => [exercise.id, exercise]),
+  )
+
+  const historyByCurrentWorkoutExerciseId: Record<string, ExerciseNoteEntry[]> = {}
+
+  for (const current of currentWorkoutExercises.filter((item) => item.deletedAt == null)) {
+    const history = allWorkoutExercises
+      .filter((item) => {
+        if (item.deletedAt != null || item.id === current.id || item.exerciseId !== current.exerciseId) {
+          return false
+        }
+
+        if (!item.notes.trim()) {
+          return false
+        }
+
+        return completedWorkoutMap.has(item.workoutId)
+      })
+      .map((item) => {
+        const workout = completedWorkoutMap.get(item.workoutId)!
+        const exercise = exerciseMap.get(item.exerciseId)
+
+        return {
+          workoutExerciseId: item.id,
+          workoutId: workout.id,
+          exerciseId: item.exerciseId,
+          exerciseName: exercise ? formatExerciseName(exercise) : 'Exercise',
+          workoutName: workout.name,
+          note: item.notes.trim(),
+          startedAt: workout.startedAt,
+          endedAt: workout.endedAt,
+        }
+      })
+      .sort(
+        (left, right) =>
+          new Date(right.endedAt ?? right.startedAt).getTime() -
+          new Date(left.endedAt ?? left.startedAt).getTime(),
+      )
+
+    historyByCurrentWorkoutExerciseId[current.id] = history
+  }
+
+  return historyByCurrentWorkoutExerciseId
 }
 
 export async function removeExerciseFromWorkout(workoutExerciseId: string) {
@@ -573,6 +824,43 @@ export async function completeWorkout(workoutId: string) {
   await savePreferences({ activeTimerEndAt: null })
 }
 
+export async function listWorkoutNoteHistory(workoutId: string): Promise<WorkoutNoteEntry[]> {
+  const current = await db.workouts.get(workoutId)
+  if (!current) {
+    return []
+  }
+
+  const workouts = (await db.workouts.toArray())
+    .filter((workout) => {
+      if (workout.deletedAt != null || workout.status !== 'completed' || workout.id === workoutId) {
+        return false
+      }
+
+      if (!workout.notes.trim()) {
+        return false
+      }
+
+      if (current.templateId) {
+        return workout.templateId === current.templateId
+      }
+
+      return workout.templateId == null && workout.name.trim() === current.name.trim()
+    })
+    .sort(
+      (left, right) =>
+        new Date(right.endedAt ?? right.startedAt).getTime() -
+        new Date(left.endedAt ?? left.startedAt).getTime(),
+    )
+
+  return workouts.map((workout) => ({
+    workoutId: workout.id,
+    workoutName: workout.name,
+    note: workout.notes.trim(),
+    startedAt: workout.startedAt,
+    endedAt: workout.endedAt,
+  }))
+}
+
 export async function cancelRestTimer() {
   await savePreferences({ activeTimerEndAt: null })
 }
@@ -600,5 +888,5 @@ export async function getSyncQueueCount() {
 export async function listAllExercises() {
   return (await db.exercises.toArray())
     .filter((item) => item.deletedAt == null)
-    .sort((left, right) => left.name.localeCompare(right.name))
+    .sort((left, right) => formatExerciseName(left).localeCompare(formatExerciseName(right)))
 }

@@ -1,12 +1,13 @@
 import { SectionCard } from '../../components/SectionCard'
 import { formatShortDate, minutesBetween } from '../../lib/time'
-import { formatExerciseBest } from '../../lib/format'
+import { formatExerciseBest, formatExerciseRecordSummary } from '../../lib/format'
 import type { ExerciseAnalytics, Preferences, WorkoutWithDetails } from '../../lib/types'
 
 interface HistoryScreenProps {
   history: WorkoutWithDetails[]
   analytics: ExerciseAnalytics[]
   preferences: Preferences | null
+  onOpenWorkout: (workoutId: string) => void
 }
 
 function Sparkline({ values }: { values: number[] }) {
@@ -34,20 +35,23 @@ export function HistoryScreen({
   history,
   analytics,
   preferences,
+  onOpenWorkout,
 }: HistoryScreenProps) {
   return (
     <div className="stack">
       <SectionCard title="Recent workouts" description="Completed sessions stay on-device and sync when configured.">
         <div className="grid-list">
           {history.map(({ workout, items }) => (
-            <article className="list-card" key={workout.id}>
+            <button className="list-card interactive left-align" key={workout.id} onClick={() => onOpenWorkout(workout.id)}>
               <div>
                 <strong>{workout.name}</strong>
                 <p>
                   {formatShortDate(workout.startedAt)} • {items.length} exercises • {minutesBetween(workout.startedAt, workout.endedAt)} min
                 </p>
+                {workout.notes.trim() ? <p>{workout.notes.trim()}</p> : null}
               </div>
-            </article>
+              <span>View</span>
+            </button>
           ))}
           {history.length === 0 ? <p className="empty-state">No completed workouts yet.</p> : null}
         </div>
@@ -64,7 +68,7 @@ export function HistoryScreen({
                 </div>
                 <div className="right-align">
                   <strong>{formatExerciseBest(entry, preferences?.weightUnit ?? 'lb')}</strong>
-                  <p>best marker</p>
+                  <p>{formatExerciseRecordSummary(entry, preferences?.weightUnit ?? 'lb')}</p>
                 </div>
               </div>
               <Sparkline values={entry.points.map((point) => point.metricValue)} />

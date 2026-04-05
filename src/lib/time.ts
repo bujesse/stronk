@@ -36,3 +36,14 @@ export function minutesBetween(startAt: string, endAt: string | null) {
   const end = endAt ? new Date(endAt).getTime() : Date.now()
   return Math.max(1, Math.round((end - new Date(startAt).getTime()) / 60000))
 }
+
+export function formatDurationSeconds(value: number | null) {
+  if (value == null) {
+    return '0:00'
+  }
+
+  const totalSeconds = Math.max(0, Math.round(value))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}

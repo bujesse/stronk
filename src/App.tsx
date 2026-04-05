@@ -1,10 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useLocation, useNavigate } from 'react-router-dom'
+import {
+  Cog,
+  Dumbbell,
+  Gauge,
+  House,
+  NotebookTabs,
+  type LucideIcon,
+} from 'lucide-react'
 import { AppShell } from './app/AppShell'
 import { DashboardScreen } from './features/dashboard/DashboardScreen'
-import { ExercisesScreen } from './features/exercises/ExercisesScreen'
 import { HistoryScreen } from './features/history/HistoryScreen'
+import { WorkoutResultsScreen } from './features/history/WorkoutResultsScreen'
 import { SettingsScreen } from './features/settings/SettingsScreen'
 import { TemplatesScreen } from './features/templates/TemplatesScreen'
 import { WorkoutScreen } from './features/workouts/WorkoutScreen'
@@ -16,17 +24,25 @@ import {
   createExercise,
   createQuickWorkout,
   createTemplate,
+  duplicateSetInWorkout,
   getActiveWorkout,
   getAnalytics,
   getPreferences,
   getSyncQueueCount,
+  getWorkoutById,
   listAllExercises,
   listTemplates,
+  listExerciseNoteHistoryForWorkout,
+  listWorkoutNoteHistory,
   listWorkoutHistory,
+  moveExerciseInWorkout,
   removeExerciseFromWorkout,
   removeSetFromWorkout,
   savePreferences,
   startWorkoutFromTemplate,
+  updateExercise,
+  updateWorkoutExerciseNotes,
+  updateWorkoutNotes,
   updateLoggedSet,
 } from './db/repository'
 import { runSync } from './sync/runSync'
@@ -39,51 +55,37 @@ import {
 } from './sync/client'
 import './index.css'
 
-type TabId = 'dashboard' | 'workout' | 'templates' | 'exercises' | 'history' | 'settings'
+type TabId = 'dashboard' | 'workout' | 'templates' | 'history' | 'settings'
 
 const routes: Record<
   TabId,
-  { title: string; path: string; navLabel?: string; moreMenu?: boolean; navIcon?: string }
+  { title: string; path: string; navLabel: string; navIcon: LucideIcon }
 > = {
-  dashboard: { title: 'Home', path: '/', navLabel: 'Home', navIcon: 'O' },
-  workout: { title: 'Log', path: '/workout', navLabel: 'Log', navIcon: '+' },
-  templates: { title: 'Plans', path: '/templates', navLabel: 'Plans', navIcon: '=' },
-  history: { title: 'PRs', path: '/history', navLabel: 'PRs', navIcon: '^' },
-  exercises: { title: 'Exercises', path: '/exercises', moreMenu: true },
-  settings: { title: 'Settings', path: '/settings', moreMenu: true },
+  dashboard: { title: 'Home', path: '/', navLabel: 'Home', navIcon: House },
+  workout: { title: 'Log', path: '/workout', navLabel: 'Log', navIcon: Dumbbell },
+  templates: { title: 'Plans', path: '/templates', navLabel: 'Plans', navIcon: NotebookTabs },
+  history: { title: 'PRs', path: '/history', navLabel: 'PRs', navIcon: Gauge },
+  settings: { title: 'Settings', path: '/settings', navLabel: 'Settings', navIcon: Cog },
 }
 
-const primaryTabs: TabId[] = ['dashboard', 'workout', 'templates', 'history']
-const moreMenuTabs: TabId[] = ['exercises', 'settings']
+const primaryTabs: TabId[] = ['dashboard', 'workout', 'templates', 'history', 'settings']
 
 const routeToTab: Array<{ path: string; id: TabId }> = [
   { path: routes.workout.path, id: 'workout' },
   { path: routes.templates.path, id: 'templates' },
   { path: routes.history.path, id: 'history' },
-  { path: routes.exercises.path, id: 'exercises' },
   { path: routes.settings.path, id: 'settings' },
+  { path: '/exercises', id: 'settings' },
   { path: routes.dashboard.path, id: 'dashboard' },
 ]
 
 function App() {
-  const [isMoreOpen, setIsMoreOpen] = useState(false)
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const location = useLocation()
   const navigate = useNavigate()
   const { session, ready: authReady } = useAuthSession()
   const lastAutoSyncedUserIdRef = useRef<string | null>(null)
   const isAutoSyncingRef = useRef(false)
-
-  const exercises = useLiveQuery(() => listAllExercises(), [], [])
-  const templates = useLiveQuery(() => listTemplates(), [], [])
-  const activeWorkout = useLiveQuery(() => getActiveWorkout(), [], null)
-  const history = useLiveQuery(() => listWorkoutHistory(), [], [])
-  const preferencesQuery = useLiveQuery(() => getPreferences(), [], null)
-  const analytics = useLiveQuery(() => getAnalytics(), [], [])
-  const pendingSyncCountQuery = useLiveQuery(() => getSyncQueueCount(), [], 0)
-  const preferences = preferencesQuery ?? null
-  const pendingSyncCount = pendingSyncCountQuery ?? 0
-  const syncConfigured = isSupabaseConfigured()
 
   const activeTab = useMemo<TabId>(() => {
     const match = routeToTab.find(({ path }) =>
@@ -92,6 +94,53 @@ function App() {
 
     return match?.id ?? 'dashboard'
   }, [location.pathname])
+
+  const workoutResultId = useMemo(() => {
+    if (!location.pathname.startsWith(`${routes.history.path}/`)) {
+      return null
+    }
+
+    return decodeURIComponent(location.pathname.slice(routes.history.path.length + 1))
+  }, [location.pathname])
+
+  const exercises = useLiveQuery(() => listAllExercises(), [], [])
+  const templates = useLiveQuery(() => listTemplates(), [], [])
+  const activeWorkout = useLiveQuery(() => getActiveWorkout(), [], null)
+  const history = useLiveQuery(
+    () => (activeTab === 'dashboard' || activeTab === 'history' ? listWorkoutHistory() : Promise.resolve([])),
+    [activeTab],
+    [],
+  )
+  const fullHistory = useLiveQuery(
+    () => (workoutResultId ? listWorkoutHistory(500) : Promise.resolve([])),
+    [workoutResultId],
+    [],
+  )
+  const preferencesQuery = useLiveQuery(() => getPreferences(), [], null)
+  const analytics = useLiveQuery(() => getAnalytics(), [], [])
+  const pendingSyncCountQuery = useLiveQuery(() => getSyncQueueCount(), [], 0)
+  const workoutNoteHistory = useLiveQuery(
+    () => (activeWorkout ? listWorkoutNoteHistory(activeWorkout.workout.id) : Promise.resolve([])),
+    [activeWorkout?.workout.id],
+    [],
+  )
+  const exerciseNoteHistory = useLiveQuery(
+    () =>
+      activeWorkout
+        ? listExerciseNoteHistoryForWorkout(activeWorkout.workout.id)
+        : Promise.resolve({}),
+    [activeWorkout?.workout.id],
+    {},
+  )
+  const preferences = preferencesQuery ?? null
+  const pendingSyncCount = pendingSyncCountQuery ?? 0
+  const syncConfigured = isSupabaseConfigured()
+
+  const workoutResult = useLiveQuery(
+    () => (workoutResultId ? getWorkoutById(workoutResultId) : Promise.resolve(null)),
+    [workoutResultId],
+    null,
+  )
 
   const status = useMemo(() => {
     if (activeWorkout) {
@@ -175,8 +224,16 @@ function App() {
             exercises={exercises}
             preferences={preferences}
             timerEndAt={preferences?.activeTimerEndAt ?? null}
+            noteHistory={workoutNoteHistory}
+            exerciseNoteHistory={exerciseNoteHistory}
             onCreateQuickWorkout={async (name, exerciseIds) => {
               await createQuickWorkout(name, exerciseIds)
+            }}
+            onUpdateWorkoutExerciseNotes={async (workoutExerciseId, notes) => {
+              await updateWorkoutExerciseNotes(workoutExerciseId, notes)
+            }}
+            onUpdateWorkoutNotes={async (workoutId, notes) => {
+              await updateWorkoutNotes(workoutId, notes)
             }}
             onUpdateLoggedSet={async (setId, updates) => {
               await updateLoggedSet(setId, updates)
@@ -184,8 +241,14 @@ function App() {
             onAddSet={async (workoutExerciseId) => {
               await addSetToWorkoutExercise(workoutExerciseId)
             }}
+            onDuplicateSet={async (setId) => {
+              await duplicateSetInWorkout(setId)
+            }}
             onRemoveSet={async (setId) => {
               await removeSetFromWorkout(setId)
+            }}
+            onMoveExercise={async (workoutExerciseId, direction) => {
+              await moveExerciseInWorkout(workoutExerciseId, direction)
             }}
             onAddExerciseToWorkout={async (workoutId, exerciseId) => {
               await addExerciseToWorkout(workoutId, exerciseId)
@@ -195,7 +258,7 @@ function App() {
             }}
             onCompleteWorkout={async (workoutId) => {
               await completeWorkout(workoutId)
-              navigate(routes.history.path)
+              navigate(`${routes.history.path}/${encodeURIComponent(workoutId)}`)
             }}
             onCancelRestTimer={async () => {
               await cancelRestTimer()
@@ -218,19 +281,22 @@ function App() {
           />
         )
       case 'history':
-        return <HistoryScreen history={history} analytics={analytics} preferences={preferences} />
-      case 'exercises':
-        return (
-          <ExercisesScreen
-            exercises={exercises}
-            onCreateExercise={async (input) => {
-              await createExercise(input)
+        return workoutResultId ? (
+          <WorkoutResultsScreen workout={workoutResult} history={fullHistory} preferences={preferences} />
+        ) : (
+          <HistoryScreen
+            history={history}
+            analytics={analytics}
+            preferences={preferences}
+            onOpenWorkout={(workoutId) => {
+              navigate(`${routes.history.path}/${encodeURIComponent(workoutId)}`)
             }}
           />
         )
       case 'settings':
         return (
           <SettingsScreen
+            exercises={exercises}
             syncConfigured={syncConfigured}
             authReady={authReady}
             authSession={session}
@@ -257,6 +323,12 @@ function App() {
               await savePreferences({ defaultRestSeconds: seconds })
             }}
             onRunSync={handleRunSync}
+            onCreateExercise={async (input) => {
+              await createExercise(input)
+            }}
+            onUpdateExercise={async (exerciseId, input) => {
+              await updateExercise(exerciseId, input)
+            }}
           />
         )
       default:
@@ -266,54 +338,32 @@ function App() {
 
   return (
     <AppShell
-      title={routes[activeTab].title}
+      title={workoutResultId ? 'Results' : routes[activeTab].title}
       status={status}
       onStatusClick={activeWorkout ? () => navigate(routes.workout.path) : undefined}
       footer={
         <>
-          {primaryTabs.map((tabId) => (
-            <button
-              key={tabId}
-              className={activeTab === tabId ? 'nav-button active' : 'nav-button'}
-              onClick={() => {
-                navigate(routes[tabId].path)
-                setIsMoreOpen(false)
-              }}
-            >
-              <span className="nav-icon" aria-hidden="true">
-                {routes[tabId].navIcon}
-              </span>
-              <span className="nav-label">{routes[tabId].navLabel}</span>
-            </button>
-          ))}
-          <button
-            className={isMoreOpen ? 'nav-button active' : 'nav-button'}
-            onClick={() => setIsMoreOpen((value) => !value)}
-          >
-            <span className="nav-icon" aria-hidden="true">
-              *
-            </span>
-            <span className="nav-label">More</span>
-          </button>
+          {primaryTabs.map((tabId) => {
+            const Icon = routes[tabId].navIcon
+
+            return (
+              <button
+                key={tabId}
+                className={activeTab === tabId ? 'nav-button active' : 'nav-button'}
+                onClick={() => {
+                  navigate(routes[tabId].path)
+                }}
+              >
+                <span className="nav-icon" aria-hidden="true">
+                  <Icon size={16} strokeWidth={2.2} />
+                </span>
+                <span className="nav-label">{routes[tabId].navLabel}</span>
+              </button>
+            )
+          })}
         </>
       }
     >
-      {isMoreOpen ? (
-        <div className="more-sheet">
-          {moreMenuTabs.map((tabId) => (
-            <button
-              key={tabId}
-              className={activeTab === tabId ? 'ghost-button active-sheet' : 'ghost-button'}
-              onClick={() => {
-                navigate(routes[tabId].path)
-                setIsMoreOpen(false)
-              }}
-            >
-              {tabId === 'exercises' ? 'Exercise library' : 'Settings & sync'}
-            </button>
-          ))}
-        </div>
-      ) : null}
       {content}
     </AppShell>
   )
