@@ -93,11 +93,11 @@ export function SettingsScreen({
         description={
           syncConfigured
             ? 'Sign in to sync workouts, templates, custom exercises, and preferences across devices.'
-            : 'Add Supabase env vars to enable sign in and cloud sync.'
+            : 'Add a PocketBase URL to enable sign in and cloud sync.'
         }
       >
         {!syncConfigured ? (
-          <p className="info-callout">Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.</p>
+          <p className="info-callout">Set `VITE_POCKETBASE_URL`.</p>
         ) : !authReady ? (
           <p className="info-callout">Checking session…</p>
         ) : authSession ? (

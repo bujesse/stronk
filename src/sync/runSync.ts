@@ -1,5 +1,6 @@
+import PocketBase, { ClientResponseError } from 'pocketbase'
 import { db } from '../db/appDb'
-import { getSupabaseClient } from './client'
+import { getPocketBaseClient } from './client'
 import {
   deserializeFromRemote,
   entityStores,
@@ -44,9 +45,34 @@ function isRemoteNewer(localUpdatedAt: string, remoteUpdatedAt: string) {
   return new Date(remoteUpdatedAt).getTime() > new Date(localUpdatedAt).getTime()
 }
 
+function escapeFilterValue(value: string) {
+  return value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')
+}
+
+async function findRemoteRecordId(
+  pocketbase: PocketBase,
+  entity: SyncEntityName,
+  entityId: string,
+  userId: string,
+) {
+  try {
+    const record = await pocketbase.collection(getRemoteTable(entity)).getFirstListItem(
+      `app_id="${escapeFilterValue(entityId)}" && user_id="${escapeFilterValue(userId)}"`,
+    )
+
+    return record.id
+  } catch (error) {
+    if (error instanceof ClientResponseError && error.status === 404) {
+      return null
+    }
+
+    throw error
+  }
+}
+
 async function pushQueuedChanges(userId: string) {
-  const supabase = getSupabaseClient()
-  if (!supabase) {
+  const pocketbase = getPocketBaseClient()
+  if (!pocketbase) {
     return { pushedCount: 0, failedCount: 0 }
   }
 
@@ -67,9 +93,12 @@ async function pushQueuedChanges(userId: string) {
 
     try {
       const payload = serializeForRemote(item.entity, item.payload as never, userId)
-      const { error } = await supabase.from(getRemoteTable(item.entity)).upsert(payload)
-      if (error) {
-        throw error
+      const recordId = await findRemoteRecordId(pocketbase, item.entity, item.entityId, userId)
+
+      if (recordId) {
+        await pocketbase.collection(getRemoteTable(item.entity)).update(recordId, payload)
+      } else {
+        await pocketbase.collection(getRemoteTable(item.entity)).create(payload)
       }
 
       if (item.entity !== 'preferences') {
@@ -96,25 +125,20 @@ async function pushQueuedChanges(userId: string) {
 }
 
 async function pullRemoteChanges(userId: string) {
-  const supabase = getSupabaseClient()
-  if (!supabase) {
+  const pocketbase = getPocketBaseClient()
+  if (!pocketbase) {
     return { pulledCount: 0 }
   }
 
   let pulledCount = 0
 
   for (const entity of syncPullOrder) {
-    const { data, error } = await supabase
-      .from(getRemoteTable(entity))
-      .select('*')
-      .eq('user_id', userId)
+    const rows = await pocketbase.collection(getRemoteTable(entity)).getFullList({
+      filter: `user_id="${escapeFilterValue(userId)}"`,
+    })
 
-    if (error) {
-      throw error
-    }
-
-    for (const row of data ?? []) {
-      const remoteRecord = deserializeFromRemote(entity, row)
+    for (const row of rows) {
+      const remoteRecord = deserializeFromRemote(entity, row as Record<string, unknown>)
       const localRecord = await getLocalRecord(entity, remoteRecord.id)
 
       if (!localRecord) {
@@ -143,27 +167,24 @@ async function pullRemoteChanges(userId: string) {
 }
 
 export async function runSync() {
-  const supabase = getSupabaseClient()
-  if (!supabase) {
+  const pocketbase = getPocketBaseClient()
+  if (!pocketbase) {
     return {
       ok: false,
-      message: 'Sync is not configured. Add Supabase env vars to enable cloud backup.',
+      message: 'Sync is not configured. Add a PocketBase URL to enable cloud backup.',
     }
   }
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-
-  if (!session?.user) {
+  const authRecord = pocketbase.authStore.record as { id?: string } | null
+  if (!authRecord?.id) {
     return {
       ok: false,
       message: 'Sign in to sync this device.',
     }
   }
 
-  const { pushedCount, failedCount } = await pushQueuedChanges(session.user.id)
-  const { pulledCount } = await pullRemoteChanges(session.user.id)
+  const { pushedCount, failedCount } = await pushQueuedChanges(authRecord.id)
+  const { pulledCount } = await pullRemoteChanges(authRecord.id)
 
   if (failedCount > 0) {
     return {

@@ -1,6 +1,6 @@
 # Stronk
 
-Offline-first workout tracker PWA inspired by Strong. Core logging works entirely in IndexedDB first, with optional Supabase auth and cloud sync for using the same data on phone and desktop.
+Offline-first workout tracker PWA inspired by Strong. Core logging works entirely in IndexedDB first, with optional PocketBase auth and cloud sync for using the same data on phone and desktop.
 
 ## Local run
 
@@ -8,6 +8,8 @@ Offline-first workout tracker PWA inspired by Strong. Core logging works entirel
 pnpm install
 pnpm dev
 ```
+
+This runs the web app only. Auth and sync will remain disabled unless `VITE_POCKETBASE_URL` points at a running PocketBase server.
 
 ## Docker deploy
 
@@ -18,8 +20,7 @@ docker build -t stronk .
 docker run -d \
   --name stronk \
   -p 4173:80 \
-  -e VITE_SUPABASE_URL=... \
-  -e VITE_SUPABASE_ANON_KEY=... \
+  -e VITE_POCKETBASE_URL=http://localhost:8090 \
   stronk
 ```
 
@@ -29,7 +30,76 @@ Or with Compose:
 docker compose up -d --build
 ```
 
-The container serves the built app with nginx and injects Supabase config at runtime through `config.js`, so you do not need to rebuild the image just to change those env vars.
+The container serves the built app with nginx and injects the PocketBase URL at runtime through `config.js`, so you do not need to rebuild the image just to change that env var.
+
+## Full self-hosted setup
+
+This repo now expects PocketBase to be self-hosted alongside the app.
+
+The compose stack contains:
+
+- `pocketbase`: auth, sync API, and SQLite data store
+- `pocketbase-bootstrap`: one-shot collection importer
+- `stronk`: the PWA served by nginx
+
+### Environment variables
+
+Copy `.env.example` to `.env` and set:
+
+```bash
+VITE_POCKETBASE_URL=http://localhost:8090
+PB_SUPERUSER_EMAIL=admin@example.com
+PB_SUPERUSER_PASSWORD=changeme12345
+```
+
+What each variable does:
+
+- `VITE_POCKETBASE_URL`: the PocketBase URL the browser should call
+- `PB_SUPERUSER_EMAIL`: PocketBase admin login used for bootstrapping collections
+- `PB_SUPERUSER_PASSWORD`: PocketBase admin password
+
+If you want to use the app from your phone on the same LAN, `localhost` is wrong. Use your server IP or domain instead, for example:
+
+```bash
+VITE_POCKETBASE_URL=http://192.168.1.50:8090
+```
+
+## Run it
+
+From the repo root:
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+Then open:
+
+- app: `http://<server-ip>:4173`
+- PocketBase admin: `http://<server-ip>:8090/_/`
+
+What happens on startup:
+
+1. PocketBase starts and opens its SQLite database in the `pocketbase_data` volume.
+2. The PocketBase superuser is created or updated from `PB_SUPERUSER_EMAIL` and `PB_SUPERUSER_PASSWORD`.
+3. The `pocketbase-bootstrap` container waits for PocketBase health, then imports the required Stronk collections.
+4. The web app starts and injects `VITE_POCKETBASE_URL` into `config.js`.
+
+### Create your first account
+
+1. Open the app at `http://<server-ip>:4173`
+2. Go to `Settings`
+3. Click `Create account`
+4. Sign in on your other device with the same email/password
+
+### PocketBase admin access
+
+To inspect the backend directly:
+
+1. Open `http://<server-ip>:8090/_/`
+2. Sign in with `PB_SUPERUSER_EMAIL` / `PB_SUPERUSER_PASSWORD`
+
+You should see the Stronk collections already created.
 
 ## Deploy
 
@@ -39,9 +109,9 @@ The container serves the built app with nginx and injects Supabase config at run
 2. Create a `.env` file in the repo root:
 
 ```bash
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_ANON_KEY=...
-SUPABASE_DB_URL=postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres?sslmode=require
+VITE_POCKETBASE_URL=http://<server-ip>:8090
+PB_SUPERUSER_EMAIL=<your-admin-email>
+PB_SUPERUSER_PASSWORD=<your-strong-password>
 ```
 
 3. Start it:
@@ -50,9 +120,9 @@ SUPABASE_DB_URL=postgresql://postgres:<password>@db.<project-ref>.supabase.co:54
 docker compose up -d --build
 ```
 
-4. The app will be available on port `4173` on that machine.
+4. The app will be available on port `4173` and PocketBase on `8090`.
 
-With `SUPABASE_DB_URL` set, `docker compose up` also runs the SQL in [supabase/schema.sql](/home/bujesse/dev/stronk/supabase/schema.sql) automatically before the app starts. If you omit `SUPABASE_DB_URL`, the bootstrap step is skipped and the app still starts.
+`docker compose up` starts PocketBase, creates or updates the PocketBase superuser, imports the required collections, and then starts the app.
 
 To update later:
 
@@ -76,12 +146,11 @@ docker run -d \
   --name stronk \
   --restart unless-stopped \
   -p 4173:80 \
-  -e VITE_SUPABASE_URL=... \
-  -e VITE_SUPABASE_ANON_KEY=... \
+  -e VITE_POCKETBASE_URL=http://<server-ip>:8090 \
   ghcr.io/<your-github-user-or-org>/stronk:main
 ```
 
-If you want automatic schema setup too, prefer `docker compose` over raw `docker run`, because the compose stack includes the one-shot schema bootstrap container.
+If you want the full self-hosted stack, prefer `docker compose`, because the compose stack includes PocketBase and the one-shot collection bootstrap container.
 
 To update later:
 
@@ -92,8 +161,7 @@ docker run -d \
   --name stronk \
   --restart unless-stopped \
   -p 4173:80 \
-  -e VITE_SUPABASE_URL=... \
-  -e VITE_SUPABASE_ANON_KEY=... \
+  -e VITE_POCKETBASE_URL=http://<server-ip>:8090 \
   ghcr.io/<your-github-user-or-org>/stronk:main
 ```
 
@@ -103,29 +171,28 @@ If you already run Caddy, Nginx Proxy Manager, Traefik, or another reverse proxy
 
 ## Accounts and Cloud Sync
 
-1. Create a Supabase project.
-2. Copy [.env.example](/home/bujesse/dev/stronk/.env.example) to `.env` and set:
+1. Copy [.env.example](/home/bujesse/dev/stronk/.env.example) to `.env` and set:
 
 ```bash
-VITE_SUPABASE_URL=...
-VITE_SUPABASE_ANON_KEY=...
-SUPABASE_DB_URL=postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres?sslmode=require
+VITE_POCKETBASE_URL=http://<server-ip>:8090
+PB_SUPERUSER_EMAIL=<your-admin-email>
+PB_SUPERUSER_PASSWORD=<your-strong-password>
 ```
 
-3. Start the stack with `docker compose up -d --build`.
-4. Open `Settings` in the app and use `Create account` or `Sign in`.
+2. Start the stack with `docker compose up -d --build`.
+3. Open `Settings` in the app and use `Create account` or `Sign in`.
 
 Account behavior:
 
-- If Supabase email confirmation is disabled, `Create account` signs in immediately.
-- If email confirmation is enabled, Supabase sends a confirmation email first.
-- For reliable email delivery on a real deployment, configure SMTP in your Supabase project.
+- `Create account` signs in immediately.
+- PocketBase is self-hosted in the compose stack.
+- For phone access on your LAN, set `VITE_POCKETBASE_URL` to your server IP or domain instead of `localhost`.
 
 Current compose behavior:
 
 - `stronk` is the web app container.
-- `supabase-bootstrap` is a one-shot init container that applies [supabase/schema.sql](/home/bujesse/dev/stronk/supabase/schema.sql) through `psql` when `SUPABASE_DB_URL` is set.
-- Supabase itself is still external; this repo does not run the full Supabase stack locally.
+- `pocketbase` is the self-hosted backend and SQLite data store.
+- `pocketbase-bootstrap` is a one-shot init container that imports the required PocketBase collections.
 
 ## GitHub Actions
 
@@ -135,7 +202,7 @@ Current compose behavior:
 GitHub Actions note:
 
 - The Docker workflow only builds and publishes the image.
-- Runtime values like `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `SUPABASE_DB_URL` belong in your deploy environment on the server, not in the image build.
+- Runtime values like `VITE_POCKETBASE_URL`, `PB_SUPERUSER_EMAIL`, and `PB_SUPERUSER_PASSWORD` belong in your deploy environment on the server, not in the image build.
 
 ## Sync model
 

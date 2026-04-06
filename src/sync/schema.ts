@@ -30,7 +30,8 @@ type SyncEntityName =
   | 'preferences'
 
 type RemoteBaseRow = {
-  id: string
+  id?: string
+  app_id: string
   user_id: string
   updated_at: string
 }
@@ -143,7 +144,7 @@ const syncEntityConfigs = {
     getLocal: (id: string) => db.exercises.get(id),
     putLocal: (record: Exercise) => db.exercises.put(record),
     serialize: (record: Exercise, userId: string): RemoteExerciseRow => ({
-      id: record.id,
+      app_id: record.id,
       user_id: userId,
       movement_name: record.movementName,
       body_region: record.bodyRegion,
@@ -158,7 +159,7 @@ const syncEntityConfigs = {
       updated_at: record.updatedAt,
     }),
     deserialize: (row: RemoteExerciseRow): Exercise => ({
-      id: row.id,
+      id: row.app_id,
       movementName: row.movement_name,
       bodyRegion: row.body_region,
       muscleGroup: row.muscle_group,
@@ -179,7 +180,7 @@ const syncEntityConfigs = {
     getLocal: (id: string) => db.workoutTemplates.get(id),
     putLocal: (record: WorkoutTemplate) => db.workoutTemplates.put(record),
     serialize: (record: WorkoutTemplate, userId: string): RemoteWorkoutTemplateRow => ({
-      id: record.id,
+      app_id: record.id,
       user_id: userId,
       name: record.name,
       notes: record.notes,
@@ -188,7 +189,7 @@ const syncEntityConfigs = {
       updated_at: record.updatedAt,
     }),
     deserialize: (row: RemoteWorkoutTemplateRow): WorkoutTemplate => ({
-      id: row.id,
+      id: row.app_id,
       name: row.name,
       notes: row.notes,
       deletedAt: row.deleted_at,
@@ -203,7 +204,7 @@ const syncEntityConfigs = {
     getLocal: (id: string) => db.templateExercises.get(id),
     putLocal: (record: TemplateExercise) => db.templateExercises.put(record),
     serialize: (record: TemplateExercise, userId: string): RemoteTemplateExerciseRow => ({
-      id: record.id,
+      app_id: record.id,
       user_id: userId,
       template_id: record.templateId,
       exercise_id: record.exerciseId,
@@ -213,7 +214,7 @@ const syncEntityConfigs = {
       updated_at: record.updatedAt,
     }),
     deserialize: (row: RemoteTemplateExerciseRow): TemplateExercise => ({
-      id: row.id,
+      id: row.app_id,
       templateId: row.template_id,
       exerciseId: row.exercise_id,
       sortOrder: row.sort_order,
@@ -229,7 +230,7 @@ const syncEntityConfigs = {
     getLocal: (id: string) => db.templateSets.get(id),
     putLocal: (record: TemplateSet) => db.templateSets.put(record),
     serialize: (record: TemplateSet, userId: string): RemoteTemplateSetRow => ({
-      id: record.id,
+      app_id: record.id,
       user_id: userId,
       template_exercise_id: record.templateExerciseId,
       sort_order: record.sortOrder,
@@ -243,7 +244,7 @@ const syncEntityConfigs = {
       updated_at: record.updatedAt,
     }),
     deserialize: (row: RemoteTemplateSetRow): TemplateSet => ({
-      id: row.id,
+      id: row.app_id,
       templateExerciseId: row.template_exercise_id,
       sortOrder: row.sort_order,
       setKind: row.set_kind,
@@ -263,7 +264,7 @@ const syncEntityConfigs = {
     getLocal: (id: string) => db.workouts.get(id),
     putLocal: (record: Workout) => db.workouts.put(record),
     serialize: (record: Workout, userId: string): RemoteWorkoutRow => ({
-      id: record.id,
+      app_id: record.id,
       user_id: userId,
       template_id: record.templateId,
       name: record.name,
@@ -277,7 +278,7 @@ const syncEntityConfigs = {
       updated_at: record.updatedAt,
     }),
     deserialize: (row: RemoteWorkoutRow): Workout => ({
-      id: row.id,
+      id: row.app_id,
       templateId: row.template_id,
       name: row.name,
       notes: row.notes,
@@ -297,7 +298,7 @@ const syncEntityConfigs = {
     getLocal: (id: string) => db.workoutExercises.get(id),
     putLocal: (record: WorkoutExercise) => db.workoutExercises.put(record),
     serialize: (record: WorkoutExercise, userId: string): RemoteWorkoutExerciseRow => ({
-      id: record.id,
+      app_id: record.id,
       user_id: userId,
       workout_id: record.workoutId,
       exercise_id: record.exerciseId,
@@ -308,7 +309,7 @@ const syncEntityConfigs = {
       updated_at: record.updatedAt,
     }),
     deserialize: (row: RemoteWorkoutExerciseRow): WorkoutExercise => ({
-      id: row.id,
+      id: row.app_id,
       workoutId: row.workout_id,
       exerciseId: row.exercise_id,
       notes: row.notes,
@@ -325,7 +326,7 @@ const syncEntityConfigs = {
     getLocal: (id: string) => db.loggedSets.get(id),
     putLocal: (record: LoggedSet) => db.loggedSets.put(record),
     serialize: (record: LoggedSet, userId: string): RemoteLoggedSetRow => ({
-      id: record.id,
+      app_id: record.id,
       user_id: userId,
       workout_exercise_id: record.workoutExerciseId,
       planned_set_id: record.plannedSetId,
@@ -341,7 +342,7 @@ const syncEntityConfigs = {
       updated_at: record.updatedAt,
     }),
     deserialize: (row: RemoteLoggedSetRow): LoggedSet => ({
-      id: row.id,
+      id: row.app_id,
       workoutExerciseId: row.workout_exercise_id,
       plannedSetId: row.planned_set_id,
       sortOrder: row.sort_order,
@@ -372,7 +373,7 @@ const syncEntityConfigs = {
       })
     },
     serialize: (record: Preferences, userId: string): RemotePreferencesRow => ({
-      id: record.id,
+      app_id: record.id,
       user_id: userId,
       weight_unit: record.weightUnit,
       default_rest_seconds: record.defaultRestSeconds,

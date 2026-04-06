@@ -1,23 +1,46 @@
 services:
-  supabase-bootstrap:
-    image: postgres:16-alpine
+  pocketbase:
+    build:
+      context: .
+      dockerfile: docker/pocketbase.Dockerfile
     environment:
-      SUPABASE_DB_URL: ${SUPABASE_DB_URL:-}
+      PB_SUPERUSER_EMAIL: ${PB_SUPERUSER_EMAIL:-admin@example.com}
+      PB_SUPERUSER_PASSWORD: ${PB_SUPERUSER_PASSWORD:-changeme12345}
+    ports:
+      - "8090:8090"
     volumes:
-      - ./supabase/schema.sql:/schema/schema.sql:ro
-      - ./docker/bootstrap-supabase-schema.sh:/bootstrap.sh:ro
-    entrypoint: ["/bin/sh", "/bootstrap.sh"]
+      - pocketbase_data:/pb/pb_data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8090/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  pocketbase-bootstrap:
+    build:
+      context: .
+      dockerfile: docker/pocketbase-bootstrap.Dockerfile
+    depends_on:
+      pocketbase:
+        condition: service_healthy
+    environment:
+      POCKETBASE_INTERNAL_URL: http://pocketbase:8090
+      PB_SUPERUSER_EMAIL: ${PB_SUPERUSER_EMAIL:-admin@example.com}
+      PB_SUPERUSER_PASSWORD: ${PB_SUPERUSER_PASSWORD:-changeme12345}
     restart: "no"
 
   stronk:
     build:
       context: .
     depends_on:
-      supabase-bootstrap:
+      pocketbase-bootstrap:
         condition: service_completed_successfully
     ports:
       - "4173:80"
     environment:
-      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL:-}
-      VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY:-}
+      VITE_POCKETBASE_URL: ${VITE_POCKETBASE_URL:-http://localhost:8090}
     restart: unless-stopped
+
+volumes:
+  pocketbase_data:

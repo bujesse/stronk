@@ -4,7 +4,7 @@
 
 - Recreate the core Strong experience for progressive overload tracking.
 - Work fully offline after first load.
-- Support optional sign-in and server sync when Supabase credentials are configured.
+- Support optional sign-in and server sync when a PocketBase server is configured.
 - Feel native on phones first, while still working on larger screens.
 
 ## V1 Scope
@@ -31,9 +31,10 @@
 
 - Frontend: React + Vite + TypeScript.
 - Local data: Dexie over IndexedDB as the authoritative client store.
-- Sync: optional Supabase Auth + Postgres sync adapter behind a repository/sync layer.
+- Sync: optional PocketBase auth + collection sync adapter behind a repository/sync layer.
 - PWA: Vite PWA plugin with cached shell and manifest.
-- Deployment: Dockerized static build served by nginx, with runtime config injection for Supabase env vars.
+- Deployment: Dockerized static build served by nginx, with runtime config injection for PocketBase env vars.
+- Self-hosted backend: Docker Compose runs PocketBase, a one-shot collection bootstrap, and the Stronk web app together.
 - Design: mobile-first single-app shell with bottom navigation and persistent active workout surface.
 
 ## Domain Model
@@ -73,9 +74,10 @@
 - Signed-in devices push queued local mutations and pull the full remote dataset into Dexie.
 - Deletes are soft deletes with tombstones locally and remotely.
 - Conflict resolution is last-write-wins on `updatedAt`.
-- Sync tables in Supabase use snake_case columns with per-user row ownership enforced by RLS.
+- Sync collections in PocketBase use snake_case fields with per-user ownership enforced by collection rules.
+- PocketBase remote records use server-generated IDs plus stable client `app_id` fields so Dexie IDs remain unchanged across sync.
 - Preferences sync only the shared fields (`weightUnit`, `defaultRestSeconds`); active rest timers remain device-local.
-- If Supabase is not configured, the app remains fully local.
+- If PocketBase is not configured, the app remains fully local.
 
 ## Prelaunch Data Policy
 

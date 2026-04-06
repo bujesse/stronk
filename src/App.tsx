@@ -48,7 +48,7 @@ import {
 import { runSync } from './sync/runSync'
 import { useAuthSession } from './hooks/useAuthSession'
 import {
-  isSupabaseConfigured,
+  isPocketBaseConfigured,
   signInWithPassword,
   signOut,
   signUpWithPassword,
@@ -134,7 +134,7 @@ function App() {
   )
   const preferences = preferencesQuery ?? null
   const pendingSyncCount = pendingSyncCountQuery ?? 0
-  const syncConfigured = isSupabaseConfigured()
+  const syncConfigured = isPocketBaseConfigured()
 
   const workoutResult = useLiveQuery(
     () => (workoutResultId ? getWorkoutById(workoutResultId) : Promise.resolve(null)),

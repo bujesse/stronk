@@ -20,7 +20,7 @@
 
 ## Data Rules
 
-- UI components do not write directly to Supabase.
+- UI components do not write directly to PocketBase.
 - All persistence flows through repository functions.
 - This repo is prelaunch: prefer destructive local schema resets over compatibility migrations.
 - Keep the local schema simple and current; do not preserve legacy fields or migration branches once the latest shape is decided.
@@ -28,7 +28,8 @@
 - Use soft deletes for synced entities.
 - Keep queue metadata separate from domain records.
 - Preferences are the exception to per-record `syncStatus`; they sync through queued payloads but keep device-local timer state out of the cloud copy.
-- Deploy-time env should be runtime-injected where possible; do not reintroduce a Docker flow that requires rebuilding the image just to change Supabase keys.
+- Deploy-time env should be runtime-injected where possible; do not reintroduce a Docker flow that requires rebuilding the image just to change PocketBase URLs.
+- PocketBase collections must use stable client `app_id` fields in addition to PocketBase record IDs; do not switch sync back to assuming the remote ID equals the Dexie ID.
 - Exercise records must declare a `trackingMode`; do not assume every movement is load-based.
 - Duration-based exercises such as cardio should use the `duration` tracking mode and store time canonically in seconds.
 - Set records must carry an explicit `setKind`; warmups are not inferred from load, reps, or position.
@@ -52,7 +53,8 @@
 - Exercise-specific setup cues belong on the workout-exercise record so each logged movement can carry its own last-note recall and note history.
 - Progression views must stay mode-aware; do not compare bodyweight, assisted, and loaded movements with one generic “best weight” rule.
 - When creating or seeding exercises, prefer the structured taxonomy format such as `Arms > Triceps` or `Back > Lats` in display terms, backed by separate stored fields.
-- Signed-in users should not have to manually export or import data between devices; sync should remain local-first but converge through push + pull.
+- Signed-in users should not have to manually export or import data between devices; sync should remain local-first but converge through push + pull through PocketBase.
+- The default self-hosted deployment target is the repo `docker compose` stack: PocketBase, one-shot collection bootstrap, and the Stronk web container.
 
 ## Quality
 
