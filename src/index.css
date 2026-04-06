@@ -265,6 +265,11 @@ h1 {
   margin: 0;
 }
 
+.results-workout-title {
+  font-size: 1.55rem;
+  line-height: 1.1;
+}
+
 .section-header p,
 .list-card p,
 .hero-card p,
@@ -305,6 +310,30 @@ h1 {
 .analytic-card,
 .embedded-card {
   padding: 1rem;
+}
+
+.analytic-card-list {
+  display: grid;
+  gap: 0.75rem;
+  width: 100%;
+  text-align: left;
+}
+
+.analytic-card-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  align-items: flex-start;
+}
+
+.analytic-card-meta {
+  text-align: right;
+}
+
+.analytic-card-detail {
+  display: grid;
+  gap: 0.8rem;
+  margin-bottom: 0.8rem;
 }
 
 .hero-card-actions {
@@ -353,6 +382,10 @@ h1 {
   gap: 0.8rem;
 }
 
+.compact-progress-points {
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+}
+
 .stats-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-bottom: 0.8rem;
@@ -370,6 +403,26 @@ h1 {
 
 .form-grid {
   margin-bottom: 1rem;
+}
+
+.workout-edit-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workout-edit-notes {
+  grid-column: 1 / -1;
+}
+
+.results-exercise-card {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.results-exercise-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  align-items: center;
 }
 
 .primary-button,
@@ -425,8 +478,7 @@ h1 {
 }
 
 .chip-button.active,
-.nav-button.active,
-.set-row.done .chip-button {
+.nav-button.active {
   background: rgba(255, 154, 61, 0.2);
   color: var(--accent-strong);
 }
@@ -485,6 +537,16 @@ h1 {
   padding-right: 3.2rem;
 }
 
+.input-with-unit-toggle {
+  position: relative;
+  display: block;
+}
+
+.input-with-unit-toggle input {
+  min-width: 0;
+  padding-right: 3.2rem;
+}
+
 .field-suffix {
   position: absolute;
   top: 50%;
@@ -494,6 +556,33 @@ h1 {
   font-size: 0.78rem;
   font-weight: 700;
   pointer-events: none;
+}
+
+.unit-toggle-button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 0;
+  cursor: pointer;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  font-weight: 700;
+  min-width: 0;
+  position: absolute;
+  top: 50%;
+  right: 0.9rem;
+  transform: translateY(-50%);
+  z-index: 2;
+  border-radius: 0;
+}
+
+.unit-toggle-button:hover {
+  color: var(--text);
+}
+
+.unit-toggle-button:focus-visible {
+  outline: 2px solid rgba(255, 154, 61, 0.35);
+  outline-offset: 1px;
 }
 
 .set-row.done {
@@ -531,6 +620,23 @@ h1 {
   box-shadow: var(--shadow);
 }
 
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.modal-close-button {
+  flex: 0 0 auto;
+}
+
 .empty-state,
 .info-callout {
   padding: 0.85rem 0.95rem;
@@ -549,6 +655,41 @@ h1 {
   color: var(--accent);
 }
 
+.progress-chart {
+  width: 100%;
+  height: 180px;
+  color: var(--accent);
+}
+
+.progress-modal-card {
+  width: min(100%, 44rem);
+}
+
+.progress-modal-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.progress-metric-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.progress-chart-card {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.progress-single-point {
+  display: grid;
+  gap: 0.35rem;
+  min-height: 7.5rem;
+  align-content: center;
+  justify-items: start;
+}
+
 .sparkline-placeholder {
   height: 68px;
   display: grid;
@@ -556,6 +697,10 @@ h1 {
   color: var(--muted);
   background: rgba(255, 249, 240, 0.05);
   border-radius: 16px;
+}
+
+.chart-placeholder {
+  height: 180px;
 }
 
 .bottom-nav {
@@ -649,6 +794,10 @@ h1 {
     grid-template-columns: 1fr;
   }
 
+  .workout-edit-grid {
+    grid-template-columns: 1fr;
+  }
+
   .set-row {
     grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
   }
@@ -684,6 +833,29 @@ h1 {
   .inline-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .analytic-card-summary {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .analytic-card-meta {
+    text-align: left;
+  }
+
+  .modal-header,
+  .modal-actions {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .modal-actions > * {
+    flex: 1;
+  }
+
+  .progress-modal-summary {
+    grid-template-columns: 1fr;
   }
 
   .section-actions {

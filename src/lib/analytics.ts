@@ -90,11 +90,28 @@ export function buildExerciseAnalytics({
         analytics.trackingMode === 'assisted_bodyweight_reps'
           ? Math.min(point.metricValue, metricValue)
           : Math.max(point.metricValue, metricValue)
+      point.loadValue = Math.max(point.loadValue, weight)
+      point.assistanceValue =
+        point.assistanceValue > 0 && assistanceWeight > 0
+          ? Math.min(point.assistanceValue, assistanceWeight)
+          : Math.max(point.assistanceValue, assistanceWeight)
+      point.assistanceVolume += assistanceWeight * reps
+      point.bestReps = Math.max(point.bestReps, reps)
+      point.sessionReps += reps
+      point.setDurationSeconds = Math.max(point.setDurationSeconds, durationSeconds)
+      point.sessionDurationSeconds += durationSeconds
       point.totalVolume += volume
     } else {
       analytics.points.push({
         workoutDate: workout.startedAt,
         metricValue,
+        loadValue: weight,
+        assistanceValue: assistanceWeight,
+        assistanceVolume: assistanceWeight * reps,
+        bestReps: reps,
+        sessionReps: reps,
+        setDurationSeconds: durationSeconds,
+        sessionDurationSeconds: durationSeconds,
         totalVolume: volume,
       })
     }

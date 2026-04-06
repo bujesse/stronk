@@ -4,6 +4,7 @@ import { DropdownField } from '../../components/DropdownField'
 import { SectionCard } from '../../components/SectionCard'
 import { useAnimatedList } from '../../hooks/useAnimatedList'
 import {
+  fromStorageWeight,
   formatExerciseName,
   getExerciseDisplayWeightUnit,
   getExerciseTrackingMode,
@@ -19,6 +20,7 @@ import type {
 interface TemplatesScreenProps {
   exercises: Exercise[]
   templates: TemplateWithDetails[]
+  editingTemplateId: string | null
   weightUnit: WeightUnit
   onCreateTemplate: (input: {
     name: string
@@ -26,6 +28,17 @@ interface TemplatesScreenProps {
     exerciseIds: string[]
     setDrafts: Record<string, TemplateSetDraft[]>
   }) => Promise<void>
+  onUpdateTemplate: (
+    templateId: string,
+    input: {
+      name: string
+      notes: string
+      exerciseIds: string[]
+      setDrafts: Record<string, TemplateSetDraft[]>
+    },
+  ) => Promise<void>
+  onCancelEditing: () => void
+  onEditTemplate: (templateId: string) => void
   onStartTemplate: (templateId: string) => void
 }
 
@@ -40,15 +53,52 @@ const emptySet = (): TemplateSetDraft => ({
 export function TemplatesScreen({
   exercises,
   templates,
+  editingTemplateId,
   weightUnit,
   onCreateTemplate,
+  onUpdateTemplate,
+  onCancelEditing,
+  onEditTemplate,
   onStartTemplate,
 }: TemplatesScreenProps) {
   const [exerciseListRef] = useAnimatedList()
-  const [name, setName] = useState('')
-  const [notes, setNotes] = useState('')
-  const [selectedExerciseIds, setSelectedExerciseIds] = useState<string[]>([])
-  const [setDrafts, setSetDrafts] = useState<Record<string, TemplateSetDraft[]>>({})
+  const editingTemplate = templates.find(({ template }) => template.id === editingTemplateId) ?? null
+  const [name, setName] = useState(editingTemplate?.template.name ?? '')
+  const [notes, setNotes] = useState(editingTemplate?.template.notes ?? '')
+  const [selectedExerciseIds, setSelectedExerciseIds] = useState<string[]>(
+    editingTemplate?.items.map((item) => item.exercise.id) ?? [],
+  )
+  const [setDrafts, setSetDrafts] = useState<Record<string, TemplateSetDraft[]>>(
+    editingTemplate
+      ? Object.fromEntries(
+          editingTemplate.items.map((item) => [
+            item.exercise.id,
+            item.sets.map((set) => {
+              const displayWeightUnit = getExerciseDisplayWeightUnit(item.exercise, weightUnit)
+
+              return {
+                setKind: set.setKind,
+                reps: set.targetReps != null ? String(set.targetReps) : '',
+                weight:
+                  set.targetWeight != null
+                    ? String(fromStorageWeight(set.targetWeight, displayWeightUnit) ?? '')
+                    : '',
+                assistanceWeight:
+                  set.targetAssistanceWeight != null
+                    ? String(
+                        fromStorageWeight(set.targetAssistanceWeight, displayWeightUnit) ?? '',
+                      )
+                    : '',
+                durationMinutes:
+                  set.targetDurationSeconds != null
+                    ? String(Number((set.targetDurationSeconds / 60).toFixed(2)))
+                    : '',
+              }
+            }),
+          ]),
+        )
+      : {},
+  )
 
   const availableExercises = useMemo(
     () => exercises.filter((exercise) => !selectedExerciseIds.includes(exercise.id)),
@@ -107,12 +157,20 @@ export function TemplatesScreen({
       return
     }
 
-    await onCreateTemplate({
+    const input = {
       name,
       notes,
       exerciseIds: selectedExerciseIds,
       setDrafts,
-    })
+    }
+
+    if (editingTemplate) {
+      await onUpdateTemplate(editingTemplate.template.id, input)
+      onCancelEditing()
+      return
+    }
+
+    await onCreateTemplate(input)
 
     setName('')
     setNotes('')
@@ -122,7 +180,21 @@ export function TemplatesScreen({
 
   return (
     <div className="stack">
-      <SectionCard title="Build template" description="Assemble the session you repeat most often.">
+      <SectionCard
+        title={editingTemplate ? 'Edit template' : 'Build template'}
+        description={
+          editingTemplate
+            ? 'Adjust the copied template before using it again.'
+            : 'Assemble the session you repeat most often.'
+        }
+        action={
+          editingTemplate ? (
+            <button className="ghost-button" onClick={onCancelEditing}>
+              Cancel
+            </button>
+          ) : undefined
+        }
+      >
         <div className="form-grid">
           <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Push day" />
           <textarea
@@ -173,7 +245,7 @@ export function TemplatesScreen({
         </div>
 
         <button className="primary-button" onClick={submit}>
-          Save template
+          {editingTemplate ? 'Save changes' : 'Save template'}
         </button>
       </SectionCard>
 
@@ -185,9 +257,14 @@ export function TemplatesScreen({
                 <strong>{template.name}</strong>
                 <p>{pluralize(items.length, 'exercise')}</p>
               </div>
-              <button className="ghost-button" onClick={() => onStartTemplate(template.id)}>
-                Start
-              </button>
+              <div className="list-card-actions">
+                <button className="ghost-button" onClick={() => onEditTemplate(template.id)}>
+                  {editingTemplateId === template.id ? 'Editing' : 'Edit'}
+                </button>
+                <button className="ghost-button" onClick={() => onStartTemplate(template.id)}>
+                  Start
+                </button>
+              </div>
             </article>
           ))}
           {templates.length === 0 ? <p className="empty-state">No templates yet.</p> : null}

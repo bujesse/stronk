@@ -24,6 +24,7 @@ import {
   createExercise,
   createQuickWorkout,
   createTemplate,
+  createTemplateFromWorkout,
   duplicateSetInWorkout,
   getActiveWorkout,
   getAnalytics,
@@ -38,9 +39,12 @@ import {
   moveExerciseInWorkout,
   removeExerciseFromWorkout,
   removeSetFromWorkout,
+  repeatWorkout,
   savePreferences,
   startWorkoutFromTemplate,
   updateExercise,
+  updateTemplate,
+  updateWorkout,
   updateWorkoutExerciseNotes,
   updateWorkoutNotes,
   updateLoggedSet,
@@ -102,6 +106,10 @@ function App() {
 
     return decodeURIComponent(location.pathname.slice(routes.history.path.length + 1))
   }, [location.pathname])
+  const editingTemplateId = useMemo(() => {
+    const templateId = new URLSearchParams(location.search).get('edit')
+    return templateId ? decodeURIComponent(templateId) : null
+  }, [location.search])
 
   const exercises = useLiveQuery(() => listAllExercises(), [], [])
   const templates = useLiveQuery(() => listTemplates(), [], [])
@@ -256,6 +264,9 @@ function App() {
             onRemoveExerciseFromWorkout={async (workoutExerciseId) => {
               await removeExerciseFromWorkout(workoutExerciseId)
             }}
+            onUpdateExercise={async (exerciseId, input) => {
+              await updateExercise(exerciseId, input)
+            }}
             onCompleteWorkout={async (workoutId) => {
               await completeWorkout(workoutId)
               navigate(`${routes.history.path}/${encodeURIComponent(workoutId)}`)
@@ -268,11 +279,22 @@ function App() {
       case 'templates':
         return (
           <TemplatesScreen
+            key={editingTemplateId ?? 'new-template'}
             exercises={exercises}
             templates={templates}
+            editingTemplateId={editingTemplateId}
             weightUnit={preferences?.weightUnit ?? 'lb'}
             onCreateTemplate={async (input) => {
               await createTemplate(input)
+            }}
+            onUpdateTemplate={async (templateId, input) => {
+              await updateTemplate(templateId, input)
+            }}
+            onCancelEditing={() => {
+              navigate(routes.templates.path)
+            }}
+            onEditTemplate={(templateId) => {
+              navigate(`${routes.templates.path}?edit=${encodeURIComponent(templateId)}`)
             }}
             onStartTemplate={async (templateId) => {
               await startWorkoutFromTemplate(templateId)
@@ -282,7 +304,37 @@ function App() {
         )
       case 'history':
         return workoutResultId ? (
-          <WorkoutResultsScreen workout={workoutResult} history={fullHistory} preferences={preferences} />
+          <WorkoutResultsScreen
+            key={
+              workoutResult
+                ? `${workoutResult.workout.id}:${workoutResult.workout.updatedAt}`
+                : `loading:${workoutResultId}`
+            }
+            workout={workoutResult}
+            history={fullHistory}
+            preferences={preferences}
+            onRepeatWorkout={async (sourceWorkoutId) => {
+              const nextWorkoutId = await repeatWorkout(sourceWorkoutId)
+              if (nextWorkoutId) {
+                navigate(routes.workout.path)
+              }
+            }}
+            onSaveAsTemplate={async (sourceWorkoutId) => {
+              const templateId = await createTemplateFromWorkout(sourceWorkoutId)
+              if (templateId) {
+                navigate(`${routes.templates.path}?edit=${encodeURIComponent(templateId)}`)
+              }
+            }}
+            onUpdateWorkout={async (workoutId, updates) => {
+              await updateWorkout(workoutId, updates)
+            }}
+            onUpdateWorkoutExerciseNotes={async (workoutExerciseId, notes) => {
+              await updateWorkoutExerciseNotes(workoutExerciseId, notes)
+            }}
+            onUpdateLoggedSet={async (setId, updates) => {
+              await updateLoggedSet(setId, updates)
+            }}
+          />
         ) : (
           <HistoryScreen
             history={history}

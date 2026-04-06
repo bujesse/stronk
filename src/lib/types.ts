@@ -226,6 +226,13 @@ export interface ExerciseAnalytics {
   points: Array<{
     workoutDate: string
     metricValue: number
+    loadValue: number
+    assistanceValue: number
+    assistanceVolume: number
+    bestReps: number
+    sessionReps: number
+    setDurationSeconds: number
+    sessionDurationSeconds: number
     totalVolume: number
   }>
 }

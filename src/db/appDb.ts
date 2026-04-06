@@ -75,6 +75,30 @@ export class StronkDb extends Dexie {
 
 export const db = new StronkDb()
 
+async function ensureBaseData() {
+  const seedExercises = createSeedExercises()
+
+  await db.transaction('rw', [db.exercises, db.preferences], async () => {
+    const existingExerciseIds = new Set((await db.exercises.toArray()).map((exercise) => exercise.id))
+    const missingSeedExercises = seedExercises.filter((exercise) => !existingExerciseIds.has(exercise.id))
+
+    if (missingSeedExercises.length > 0) {
+      await db.exercises.bulkPut(missingSeedExercises)
+    }
+
+    const preferences = await db.preferences.get('preferences')
+    if (!preferences) {
+      await db.preferences.put({
+        id: 'preferences',
+        weightUnit: 'lb',
+        defaultRestSeconds: 120,
+        activeTimerEndAt: null,
+        updatedAt: new Date().toISOString(),
+      })
+    }
+  })
+}
+
 db.on('populate', async () => {
   await db.exercises.bulkAdd(createSeedExercises())
   await db.preferences.add({
@@ -85,3 +109,5 @@ db.on('populate', async () => {
     updatedAt: new Date().toISOString(),
   })
 })
+
+db.on('ready', () => ensureBaseData())

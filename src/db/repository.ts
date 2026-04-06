@@ -155,6 +155,7 @@ export async function createTemplate(input: {
 }) {
   const timestamp = nowIso()
   const templateId = createId('template')
+
   await db.transaction(
     'rw',
     [db.workoutTemplates, db.templateExercises, db.templateSets, db.syncQueue],
@@ -172,15 +173,172 @@ export async function createTemplate(input: {
       await db.workoutTemplates.put(template)
       await queue('workoutTemplate', template.id, 'upsert', template)
 
-      for (const [index, exerciseId] of input.exerciseIds.entries()) {
-        const exercise = await db.exercises.get(exerciseId)
-        const trackingMode = exercise ? getExerciseTrackingMode(exercise) : 'weight_reps'
-        const weightUnit = exercise?.preferredWeightUnit ?? (await getWeightUnit())
+      await insertTemplateItems(templateId, input, timestamp)
+    },
+  )
+
+  return templateId
+}
+
+async function insertTemplateItems(
+  templateId: string,
+  input: {
+    exerciseIds: string[]
+    setDrafts: Record<string, TemplateSetDraft[]>
+  },
+  timestamp: string,
+) {
+  for (const [index, exerciseId] of input.exerciseIds.entries()) {
+    const exercise = await db.exercises.get(exerciseId)
+    const trackingMode = exercise ? getExerciseTrackingMode(exercise) : 'weight_reps'
+    const weightUnit = exercise?.preferredWeightUnit ?? (await getWeightUnit())
+    const templateExercise: TemplateExercise = {
+      id: createId('templateExercise'),
+      templateId,
+      exerciseId,
+      sortOrder: index,
+      deletedAt: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      syncStatus: 'pending',
+    }
+
+    await db.templateExercises.put(templateExercise)
+    await queue('templateExercise', templateExercise.id, 'upsert', templateExercise)
+
+    const drafts = input.setDrafts[exerciseId] ?? []
+    for (const [setIndex, draft] of drafts.entries()) {
+      const templateSet: TemplateSet = {
+        id: createId('templateSet'),
+        templateExerciseId: templateExercise.id,
+        sortOrder: setIndex,
+        setKind: draft.setKind,
+        targetReps: draft.reps ? Number(draft.reps) : null,
+        targetWeight:
+          trackingMode === 'weight_reps' && draft.weight
+            ? toStorageWeight(Number(draft.weight), weightUnit)
+            : null,
+        targetAssistanceWeight:
+          trackingMode === 'assisted_bodyweight_reps' && draft.assistanceWeight
+            ? toStorageWeight(Number(draft.assistanceWeight), weightUnit)
+            : null,
+        targetDurationSeconds:
+          trackingMode === 'duration' && draft.durationMinutes
+            ? Math.round(Number(draft.durationMinutes) * 60)
+            : null,
+        deletedAt: null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        syncStatus: 'pending',
+      }
+
+      await db.templateSets.put(templateSet)
+      await queue('templateSet', templateSet.id, 'upsert', templateSet)
+    }
+  }
+}
+
+export async function updateTemplate(
+  templateId: string,
+  input: {
+    name: string
+    notes: string
+    exerciseIds: string[]
+    setDrafts: Record<string, TemplateSetDraft[]>
+  },
+) {
+  const current = await db.workoutTemplates.get(templateId)
+  if (!current) {
+    return null
+  }
+
+  const timestamp = nowIso()
+  await db.transaction(
+    'rw',
+    [db.workoutTemplates, db.templateExercises, db.templateSets, db.syncQueue],
+    async () => {
+      const template: WorkoutTemplate = {
+        ...current,
+        name: input.name.trim(),
+        notes: input.notes.trim(),
+        updatedAt: timestamp,
+        syncStatus: 'pending',
+      }
+
+      await db.workoutTemplates.put(template)
+      await queue('workoutTemplate', template.id, 'upsert', template)
+
+      const existingTemplateExercises = (await db.templateExercises.where({ templateId }).toArray()).filter(
+        (item) => item.deletedAt == null,
+      )
+      const existingTemplateExerciseIds = new Set(existingTemplateExercises.map((item) => item.id))
+      const existingTemplateSets = (await db.templateSets.toArray()).filter(
+        (item) => item.deletedAt == null && existingTemplateExerciseIds.has(item.templateExerciseId),
+      )
+
+      for (const existingSet of existingTemplateSets) {
+        const deletedSet: TemplateSet = {
+          ...existingSet,
+          deletedAt: timestamp,
+          updatedAt: timestamp,
+          syncStatus: 'pending',
+        }
+
+        await db.templateSets.put(deletedSet)
+        await queue('templateSet', deletedSet.id, 'delete', deletedSet)
+      }
+
+      for (const existingTemplateExercise of existingTemplateExercises) {
+        const deletedTemplateExercise: TemplateExercise = {
+          ...existingTemplateExercise,
+          deletedAt: timestamp,
+          updatedAt: timestamp,
+          syncStatus: 'pending',
+        }
+
+        await db.templateExercises.put(deletedTemplateExercise)
+        await queue('templateExercise', deletedTemplateExercise.id, 'delete', deletedTemplateExercise)
+      }
+
+      await insertTemplateItems(templateId, input, timestamp)
+    },
+  )
+
+  return templateId
+}
+
+export async function createTemplateFromWorkout(workoutId: string) {
+  const workout = await getWorkoutById(workoutId)
+  if (!workout) {
+    return null
+  }
+
+  const timestamp = nowIso()
+  const templateId = createId('template')
+
+  await db.transaction(
+    'rw',
+    [db.workoutTemplates, db.templateExercises, db.templateSets, db.syncQueue],
+    async () => {
+      const template: WorkoutTemplate = {
+        id: templateId,
+        name: workout.workout.name,
+        notes: workout.workout.notes.trim(),
+        deletedAt: null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        syncStatus: 'pending',
+      }
+
+      await db.workoutTemplates.put(template)
+      await queue('workoutTemplate', template.id, 'upsert', template)
+
+      for (const item of workout.items) {
         const templateExercise: TemplateExercise = {
           id: createId('templateExercise'),
           templateId,
-          exerciseId,
-          sortOrder: index,
+          exerciseId: item.exercise.id,
+          sortOrder: item.workoutExercise.sortOrder,
           deletedAt: null,
           createdAt: timestamp,
           updatedAt: timestamp,
@@ -190,26 +348,16 @@ export async function createTemplate(input: {
         await db.templateExercises.put(templateExercise)
         await queue('templateExercise', templateExercise.id, 'upsert', templateExercise)
 
-        const drafts = input.setDrafts[exerciseId] ?? []
-        for (const [setIndex, draft] of drafts.entries()) {
+        for (const set of item.sets) {
           const templateSet: TemplateSet = {
             id: createId('templateSet'),
             templateExerciseId: templateExercise.id,
-            sortOrder: setIndex,
-            setKind: draft.setKind,
-            targetReps: draft.reps ? Number(draft.reps) : null,
-            targetWeight:
-              trackingMode === 'weight_reps' && draft.weight
-                ? toStorageWeight(Number(draft.weight), weightUnit)
-                : null,
-            targetAssistanceWeight:
-              trackingMode === 'assisted_bodyweight_reps' && draft.assistanceWeight
-                ? toStorageWeight(Number(draft.assistanceWeight), weightUnit)
-                : null,
-            targetDurationSeconds:
-              trackingMode === 'duration' && draft.durationMinutes
-                ? Math.round(Number(draft.durationMinutes) * 60)
-                : null,
+            sortOrder: set.sortOrder,
+            setKind: set.setKind,
+            targetReps: set.reps,
+            targetWeight: set.weight,
+            targetAssistanceWeight: set.assistanceWeight,
+            targetDurationSeconds: set.durationSeconds,
             deletedAt: null,
             createdAt: timestamp,
             updatedAt: timestamp,
@@ -222,6 +370,8 @@ export async function createTemplate(input: {
       }
     },
   )
+
+  return templateId
 }
 
 export async function listTemplates(): Promise<TemplateWithDetails[]> {
@@ -404,6 +554,91 @@ export async function createQuickWorkout(name: string, exerciseIds: string[]) {
   return workoutId
 }
 
+export async function repeatWorkout(workoutId: string) {
+  const original = await db.workouts.get(workoutId)
+  if (!original || original.deletedAt != null) {
+    return null
+  }
+
+  const timestamp = nowIso()
+  const nextWorkoutId = createId('workout')
+  const workoutExercises = (await db.workoutExercises.where({ workoutId }).toArray())
+    .filter((item) => item.deletedAt == null)
+    .sort((left, right) => left.sortOrder - right.sortOrder)
+  const loggedSets = (await db.loggedSets.toArray()).filter((item) => item.deletedAt == null)
+
+  await db.transaction(
+    'rw',
+    [db.workouts, db.workoutExercises, db.loggedSets, db.preferences, db.syncQueue],
+    async () => {
+      const workout: Workout = {
+        id: nextWorkoutId,
+        templateId: original.templateId,
+        name: original.name,
+        notes: '',
+        caloriesBurned: null,
+        status: 'active',
+        startedAt: timestamp,
+        endedAt: null,
+        deletedAt: null,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        syncStatus: 'pending',
+      }
+
+      await db.workouts.put(workout)
+      await queue('workout', workout.id, 'upsert', workout)
+
+      for (const originalWorkoutExercise of workoutExercises) {
+        const workoutExercise: WorkoutExercise = {
+          id: createId('workoutExercise'),
+          workoutId: nextWorkoutId,
+          exerciseId: originalWorkoutExercise.exerciseId,
+          notes: originalWorkoutExercise.notes,
+          sortOrder: originalWorkoutExercise.sortOrder,
+          deletedAt: null,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          syncStatus: 'pending',
+        }
+
+        await db.workoutExercises.put(workoutExercise)
+        await queue('workoutExercise', workoutExercise.id, 'upsert', workoutExercise)
+
+        const sets = loggedSets
+          .filter((set) => set.workoutExerciseId === originalWorkoutExercise.id)
+          .sort((left, right) => left.sortOrder - right.sortOrder)
+
+        for (const originalSet of sets) {
+          const loggedSet: LoggedSet = {
+            id: createId('loggedSet'),
+            workoutExerciseId: workoutExercise.id,
+            plannedSetId: originalSet.plannedSetId,
+            sortOrder: originalSet.sortOrder,
+            setKind: originalSet.setKind,
+            reps: originalSet.reps,
+            weight: originalSet.weight,
+            assistanceWeight: originalSet.assistanceWeight,
+            durationSeconds: originalSet.durationSeconds,
+            completedAt: null,
+            deletedAt: null,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+            syncStatus: 'pending',
+          }
+
+          await db.loggedSets.put(loggedSet)
+          await queue('loggedSet', loggedSet.id, 'upsert', loggedSet)
+        }
+      }
+
+      await savePreferences({ activeTimerEndAt: null })
+    },
+  )
+
+  return nextWorkoutId
+}
+
 export async function getActiveWorkout(): Promise<WorkoutWithDetails | null> {
   const workout = await db.workouts.where('status').equals('active').last()
   if (!workout || workout.deletedAt) {
@@ -500,6 +735,13 @@ export async function updateLoggedSet(
 }
 
 export async function updateWorkoutNotes(workoutId: string, notes: string) {
+  await updateWorkout(workoutId, { notes: notes.trim() })
+}
+
+export async function updateWorkout(
+  workoutId: string,
+  updates: Partial<Pick<Workout, 'name' | 'notes' | 'caloriesBurned' | 'startedAt' | 'endedAt'>>,
+) {
   const current = await db.workouts.get(workoutId)
   if (!current) {
     return
@@ -507,7 +749,7 @@ export async function updateWorkoutNotes(workoutId: string, notes: string) {
 
   const next: Workout = {
     ...current,
-    notes: notes.trim(),
+    ...updates,
     updatedAt: nowIso(),
     syncStatus: 'pending',
   }

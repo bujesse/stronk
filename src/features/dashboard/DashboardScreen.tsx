@@ -79,18 +79,20 @@ export function DashboardScreen({
             <p>minutes</p>
           </div>
         </div>
-        {leaders.map((entry) => (
-          <div className="insight-row" key={entry.exerciseId}>
-            <div>
-              <strong>{entry.exerciseName}</strong>
-              <p>{pluralize(entry.totalSessions, 'session')}</p>
+        <div className="stack compact">
+          {leaders.map((entry) => (
+            <div className="insight-row" key={entry.exerciseId}>
+              <div>
+                <strong>{entry.exerciseName}</strong>
+                <p>{pluralize(entry.totalSessions, 'session')}</p>
+              </div>
+              <div className="right-align">
+                <strong>{formatExerciseBest(entry, preferences?.weightUnit ?? 'lb')}</strong>
+                <p>best marker</p>
+              </div>
             </div>
-            <div className="right-align">
-              <strong>{formatExerciseBest(entry, preferences?.weightUnit ?? 'lb')}</strong>
-              <p>best marker</p>
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </SectionCard>
     </div>
   )

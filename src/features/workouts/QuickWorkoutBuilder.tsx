@@ -8,10 +8,8 @@ interface QuickWorkoutBuilderProps {
   exercises: Exercise[]
   quickName: string
   selectedExerciseIds: string[]
-  quickExerciseToAdd: string
   onQuickNameChange: (value: string) => void
-  onQuickExerciseToAddChange: (value: string) => void
-  onAddExercise: () => void
+  onAddExercise: (exerciseId: string) => void
   onRemoveExercise: (exerciseId: string) => void
   onStart: () => Promise<void>
 }
@@ -20,9 +18,7 @@ export function QuickWorkoutBuilder({
   exercises,
   quickName,
   selectedExerciseIds,
-  quickExerciseToAdd,
   onQuickNameChange,
-  onQuickExerciseToAddChange,
   onAddExercise,
   onRemoveExercise,
   onStart,
@@ -37,7 +33,7 @@ export function QuickWorkoutBuilder({
           <div className="inline-actions align-end add-exercise-row">
             <DropdownField
               label="Exercise"
-              value={quickExerciseToAdd}
+              value=""
               placeholder="Choose exercise"
               searchable
               emptyMessage="No exercises match that search."
@@ -47,11 +43,8 @@ export function QuickWorkoutBuilder({
                   value: exercise.id,
                   label: formatExerciseName(exercise),
                 }))}
-              onChange={onQuickExerciseToAddChange}
+              onChange={onAddExercise}
             />
-            <button className="primary-button" onClick={onAddExercise}>
-              Add
-            </button>
           </div>
           {selectedExerciseIds.length > 0 ? (
             <div className="chip-row" ref={quickExerciseListRef}>

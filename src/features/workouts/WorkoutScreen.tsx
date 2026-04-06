@@ -55,6 +55,18 @@ interface WorkoutScreenProps {
   onMoveExercise: (workoutExerciseId: string, direction: 'up' | 'down') => Promise<void>
   onAddExerciseToWorkout: (workoutId: string, exerciseId: string) => Promise<void>
   onRemoveExerciseFromWorkout: (workoutExerciseId: string) => Promise<void>
+  onUpdateExercise: (
+    exerciseId: string,
+    input: {
+      movementName: string
+      bodyRegion?: Exercise['bodyRegion'] | null
+      muscleGroup?: string
+      equipment?: string
+      preferredWeightUnit?: Preferences['weightUnit'] | null
+      trackingMode: Exercise['trackingMode']
+      defaultRestSeconds?: number | null
+    },
+  ) => Promise<void>
   onCompleteWorkout: (workoutId: string) => Promise<void>
   onCancelRestTimer: () => Promise<void>
 }
@@ -76,6 +88,7 @@ export function WorkoutScreen({
   onMoveExercise,
   onAddExerciseToWorkout,
   onRemoveExerciseFromWorkout,
+  onUpdateExercise,
   onCompleteWorkout,
   onCancelRestTimer,
 }: WorkoutScreenProps) {
@@ -84,8 +97,6 @@ export function WorkoutScreen({
 
   const [quickName, setQuickName] = useState('')
   const [selectedExerciseIds, setSelectedExerciseIds] = useState<string[]>([])
-  const [quickExerciseToAdd, setQuickExerciseToAdd] = useState('')
-  const [exerciseToAdd, setExerciseToAdd] = useState('')
   const [editingExerciseNote, setEditingExerciseNote] = useState<{
     workoutExerciseId: string
     exerciseName: string
@@ -102,7 +113,6 @@ export function WorkoutScreen({
     await onCreateQuickWorkout(quickName, selectedExerciseIds)
     setQuickName('')
     setSelectedExerciseIds([])
-    setQuickExerciseToAdd('')
   }
 
   if (!activeWorkout) {
@@ -111,16 +121,13 @@ export function WorkoutScreen({
         exercises={exercises}
         quickName={quickName}
         selectedExerciseIds={selectedExerciseIds}
-        quickExerciseToAdd={quickExerciseToAdd}
         onQuickNameChange={setQuickName}
-        onQuickExerciseToAddChange={setQuickExerciseToAdd}
-        onAddExercise={() => {
-          if (!quickExerciseToAdd || selectedExerciseIds.includes(quickExerciseToAdd)) {
+        onAddExercise={(exerciseId) => {
+          if (!exerciseId || selectedExerciseIds.includes(exerciseId)) {
             return
           }
 
-          setSelectedExerciseIds((current) => [...current, quickExerciseToAdd])
-          setQuickExerciseToAdd('')
+          setSelectedExerciseIds((current) => [...current, exerciseId])
         }}
         onRemoveExercise={(exerciseId) =>
           setSelectedExerciseIds((current) => current.filter((id) => id !== exerciseId))
@@ -180,29 +187,23 @@ export function WorkoutScreen({
           <div className="inline-actions align-end add-exercise-row">
             <DropdownField
               label="Exercise"
-              value={exerciseToAdd}
+              value=""
               placeholder="Choose exercise"
               searchable
               emptyMessage="No exercises match that search."
-              options={exercises.map((exercise) => ({
-                value: exercise.id,
-                label: formatExerciseName(exercise),
-              }))}
-              onChange={setExerciseToAdd}
+              options={exercises
+                .filter(
+                  (exercise) =>
+                    !activeWorkout.items.some(
+                      (item) => item.workoutExercise.exerciseId === exercise.id,
+                    ),
+                )
+                .map((exercise) => ({
+                  value: exercise.id,
+                  label: formatExerciseName(exercise),
+                }))}
+              onChange={(exerciseId) => onAddExerciseToWorkout(activeWorkout.workout.id, exerciseId)}
             />
-            <button
-              className="primary-button"
-              onClick={async () => {
-                if (!exerciseToAdd) {
-                  return
-                }
-
-                await onAddExerciseToWorkout(activeWorkout.workout.id, exerciseToAdd)
-                setExerciseToAdd('')
-              }}
-            >
-              Add
-            </button>
           </div>
         </SectionCard>
       </div>
@@ -231,6 +232,7 @@ export function WorkoutScreen({
             onDuplicateSet={onDuplicateSet}
             onRemoveSet={onRemoveSet}
             onMoveExercise={onMoveExercise}
+            onUpdateExercise={onUpdateExercise}
           />
         ))}
       </div>
@@ -285,6 +287,7 @@ interface WorkoutExerciseCardProps {
   onDuplicateSet: WorkoutScreenProps['onDuplicateSet']
   onRemoveSet: WorkoutScreenProps['onRemoveSet']
   onMoveExercise: WorkoutScreenProps['onMoveExercise']
+  onUpdateExercise: WorkoutScreenProps['onUpdateExercise']
 }
 
 function WorkoutExerciseCard({
@@ -302,9 +305,25 @@ function WorkoutExerciseCard({
   onDuplicateSet,
   onRemoveSet,
   onMoveExercise,
+  onUpdateExercise,
 }: WorkoutExerciseCardProps) {
   const [setGridRef] = useAnimatedList()
   const displayWeightUnit = getExerciseDisplayWeightUnit(exercise, preferences?.weightUnit ?? 'lb')
+  const trackingMode = getExerciseTrackingMode(exercise)
+
+  async function toggleExerciseWeightUnit() {
+    const nextUnit = displayWeightUnit === 'lb' ? 'kg' : 'lb'
+
+    await onUpdateExercise(exercise.id, {
+      movementName: exercise.movementName,
+      bodyRegion: exercise.bodyRegion,
+      muscleGroup: exercise.muscleGroup ?? undefined,
+      equipment: exercise.equipment ?? undefined,
+      preferredWeightUnit: nextUnit,
+      trackingMode: exercise.trackingMode,
+      defaultRestSeconds: exercise.defaultRestSeconds,
+    })
+  }
 
   return (
     <SectionCard
@@ -373,11 +392,7 @@ function WorkoutExerciseCard({
             key={set.id}
           >
             <span>Set {index + 1}</span>
-            {(() => {
-              const trackingMode = getExerciseTrackingMode(exercise)
-
-              return (
-                <>
+            <>
                   {trackingMode !== 'duration' ? (
                     <input
                       defaultValue={set.reps ?? ''}
@@ -391,7 +406,7 @@ function WorkoutExerciseCard({
                     />
                   ) : null}
                   {trackingMode === 'duration' ? (
-                    <label className="input-with-suffix wide-input">
+                    <div className="input-with-suffix wide-input">
                       <input
                         defaultValue={
                           set.durationSeconds != null ? Number((set.durationSeconds / 60).toFixed(2)) : ''
@@ -407,10 +422,10 @@ function WorkoutExerciseCard({
                         }
                       />
                       <span className="field-suffix">min</span>
-                    </label>
+                    </div>
                   ) : null}
                   {trackingMode === 'weight_reps' ? (
-                    <label className="input-with-suffix">
+                    <div className="input-with-unit-toggle input-with-suffix" key={`${set.id}-${displayWeightUnit}-weight`}>
                       <input
                         defaultValue={fromStorageWeight(set.weight, displayWeightUnit) ?? ''}
                         placeholder="Weight"
@@ -421,11 +436,22 @@ function WorkoutExerciseCard({
                           })
                         }
                       />
-                      <span className="field-suffix">{displayWeightUnit}</span>
-                    </label>
+                      <button
+                        className="unit-toggle-button"
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault()
+                          void toggleExerciseWeightUnit()
+                        }}
+                        title="Toggle exercise unit"
+                        aria-label={`Toggle ${formatExerciseName(exercise)} unit`}
+                      >
+                        {displayWeightUnit}
+                      </button>
+                    </div>
                   ) : null}
                   {trackingMode === 'assisted_bodyweight_reps' ? (
-                    <label className="input-with-suffix">
+                    <div className="input-with-unit-toggle input-with-suffix" key={`${set.id}-${displayWeightUnit}-assist`}>
                       <input
                         defaultValue={
                           fromStorageWeight(set.assistanceWeight, displayWeightUnit) ?? ''
@@ -438,8 +464,19 @@ function WorkoutExerciseCard({
                           })
                         }
                       />
-                      <span className="field-suffix">{displayWeightUnit}</span>
-                    </label>
+                      <button
+                        className="unit-toggle-button"
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault()
+                          void toggleExerciseWeightUnit()
+                        }}
+                        title="Toggle exercise unit"
+                        aria-label={`Toggle ${formatExerciseName(exercise)} unit`}
+                      >
+                        {displayWeightUnit}
+                      </button>
+                    </div>
                   ) : null}
                   <div className="set-actions">
                     <button
@@ -483,9 +520,7 @@ function WorkoutExerciseCard({
                       <Trash2 size={16} strokeWidth={2.1} />
                     </button>
                   </div>
-                </>
-              )
-            })()}
+            </>
           </div>
         ))}
       </div>

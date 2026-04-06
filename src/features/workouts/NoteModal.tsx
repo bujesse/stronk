@@ -26,12 +26,12 @@ export function NoteModal({
         aria-modal="true"
         aria-labelledby="note-modal-title"
       >
-        <div className="section-header">
+        <div className="modal-header">
           <div>
             <strong id="note-modal-title">{title}</strong>
           </div>
           <button
-            className="ghost-button compact-icon-button"
+            className="ghost-button compact-icon-button modal-close-button"
             onClick={onClose}
             aria-label="Close note editor"
             title="Close"
@@ -45,7 +45,7 @@ export function NoteModal({
           rows={5}
           onChange={(event) => onChange(event.target.value)}
         />
-        <div className="section-actions">
+        <div className="modal-actions">
           <button className="ghost-button" onClick={onClose}>
             Cancel
           </button>
@@ -57,4 +57,3 @@ export function NoteModal({
     </div>
   )
 }
-
