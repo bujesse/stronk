@@ -38,6 +38,7 @@ import {
   listWorkoutHistory,
   moveExerciseInWorkout,
   removeExerciseFromWorkout,
+  removeWorkout,
   removeSetFromWorkout,
   repeatWorkout,
   savePreferences,
@@ -324,6 +325,10 @@ function App() {
               if (templateId) {
                 navigate(`${routes.templates.path}?edit=${encodeURIComponent(templateId)}`)
               }
+            }}
+            onDeleteWorkout={async (workoutId) => {
+              await removeWorkout(workoutId)
+              navigate(routes.history.path)
             }}
             onUpdateWorkout={async (workoutId, updates) => {
               await updateWorkout(workoutId, updates)

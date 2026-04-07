@@ -425,6 +425,11 @@ h1 {
   align-items: center;
 }
 
+.results-exercise-summary > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
 .primary-button,
 .ghost-button,
 .chip-button,
@@ -478,7 +483,8 @@ h1 {
 }
 
 .chip-button.active,
-.nav-button.active {
+.nav-button.active,
+.compact-icon-button.is-active {
   background: rgba(255, 154, 61, 0.2);
   color: var(--accent-strong);
 }
@@ -661,6 +667,22 @@ h1 {
   color: var(--accent);
 }
 
+.progress-point {
+  fill: currentColor;
+  stroke: rgba(24, 17, 13, 0.98);
+  stroke-width: 1.8;
+  cursor: pointer;
+}
+
+.progress-point.active {
+  fill: #fff0de;
+}
+
+.progress-point-hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
 .progress-modal-card {
   width: min(100%, 44rem);
 }
@@ -688,6 +710,59 @@ h1 {
   min-height: 7.5rem;
   align-content: center;
   justify-items: start;
+}
+
+.progress-active-point {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.progress-set-row {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.results-set-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.8rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 16px;
+  background: rgba(255, 250, 241, 0.04);
+  border: 1px solid rgba(255, 184, 118, 0.16);
+}
+
+.results-set-row p,
+.results-set-row strong {
+  margin: 0;
+}
+
+.results-set-row p {
+  text-align: right;
+}
+
+.results-set-row.done {
+  outline: 1px solid rgba(255, 154, 61, 0.22);
+}
+
+.results-set-row.warmup {
+  background: rgba(255, 233, 197, 0.06);
+  border-style: dashed;
+}
+
+.results-summary-tile {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 16px;
+  background: rgba(255, 250, 241, 0.04);
+  border: 1px solid rgba(255, 184, 118, 0.14);
+}
+
+.results-summary-tile strong,
+.results-summary-tile p {
+  margin: 0;
 }
 
 .sparkline-placeholder {
@@ -856,6 +931,16 @@ h1 {
 
   .progress-modal-summary {
     grid-template-columns: 1fr;
+  }
+
+  .results-set-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3rem;
+  }
+
+  .results-set-row p {
+    text-align: left;
   }
 
   .section-actions {

@@ -25,6 +25,7 @@ interface WorkoutResultsScreenProps {
   preferences: Preferences | null
   onRepeatWorkout: (workoutId: string) => Promise<void>
   onSaveAsTemplate: (workoutId: string) => Promise<void>
+  onDeleteWorkout: (workoutId: string) => Promise<void>
   onUpdateWorkout: (
     workoutId: string,
     updates: Partial<Pick<Workout, 'name' | 'notes' | 'caloriesBurned' | 'startedAt' | 'endedAt'>>,
@@ -96,6 +97,113 @@ function getCurrentMarker(
   }
 }
 
+function formatWorkoutSetLine(
+  trackingMode: TrackingMode,
+  set: WorkoutWithDetails['items'][number]['sets'][number],
+  unit: 'lb' | 'kg',
+) {
+  switch (trackingMode) {
+    case 'weight_reps':
+      return `${set.reps ?? 0} reps @ ${formatWeight(set.weight, unit)}`
+    case 'bodyweight_reps':
+      return `${set.reps ?? 0} reps`
+    case 'assisted_bodyweight_reps':
+      return `${set.reps ?? 0} reps @ ${formatWeight(set.assistanceWeight, unit)} assist`
+    case 'duration':
+      return formatDurationSeconds(set.durationSeconds ?? 0)
+  }
+}
+
+function buildExerciseSummaryCards(
+  trackingMode: TrackingMode,
+  item: WorkoutWithDetails['items'][number],
+  unit: 'lb' | 'kg',
+) {
+  const completedSets = item.sets.filter((set) => set.completedAt != null && set.setKind !== 'warmup')
+  const warmupCount = item.sets.filter((set) => set.setKind === 'warmup').length
+  const cards = [
+    {
+      label: 'Sets',
+      value: `${completedSets.length}/${item.sets.length}`,
+      detail: warmupCount > 0 ? `${warmupCount} warm-up` : 'completed/total',
+    },
+  ]
+
+  switch (trackingMode) {
+    case 'weight_reps': {
+      const bestLoad = completedSets.length > 0 ? Math.max(...completedSets.map((set) => set.weight ?? 0)) : null
+      const totalReps = completedSets.reduce((sum, set) => sum + (set.reps ?? 0), 0)
+      const totalVolume = completedSets.reduce((sum, set) => sum + (set.weight ?? 0) * (set.reps ?? 0), 0)
+
+      cards.push({
+        label: 'Best load',
+        value: formatWeight(bestLoad, unit),
+        detail: `${totalReps} total reps`,
+      })
+      cards.push({
+        label: 'Workout volume',
+        value: formatVolume(totalVolume, unit),
+        detail: 'load x reps',
+      })
+      break
+    }
+    case 'bodyweight_reps': {
+      const bestReps = completedSets.length > 0 ? Math.max(...completedSets.map((set) => set.reps ?? 0)) : 0
+      const totalReps = completedSets.reduce((sum, set) => sum + (set.reps ?? 0), 0)
+
+      cards.push({
+        label: 'Best set',
+        value: `${bestReps} reps`,
+        detail: 'top effort',
+      })
+      cards.push({
+        label: 'Workout reps',
+        value: `${totalReps}`,
+        detail: 'total reps',
+      })
+      break
+    }
+    case 'assisted_bodyweight_reps': {
+      const assistValues = completedSets
+        .map((set) => set.assistanceWeight)
+        .filter((value): value is number => value != null)
+      const leastAssist = assistValues.length > 0 ? Math.min(...assistValues) : null
+      const bestReps = completedSets.length > 0 ? Math.max(...completedSets.map((set) => set.reps ?? 0)) : 0
+      const totalReps = completedSets.reduce((sum, set) => sum + (set.reps ?? 0), 0)
+
+      cards.push({
+        label: 'Least assist',
+        value: formatWeight(leastAssist, unit),
+        detail: `${bestReps} best reps`,
+      })
+      cards.push({
+        label: 'Workout reps',
+        value: `${totalReps}`,
+        detail: 'total reps',
+      })
+      break
+    }
+    case 'duration': {
+      const bestDuration = completedSets.length > 0 ? Math.max(...completedSets.map((set) => set.durationSeconds ?? 0)) : 0
+      const totalDuration = completedSets.reduce((sum, set) => sum + (set.durationSeconds ?? 0), 0)
+
+      cards.push({
+        label: 'Best set',
+        value: formatDurationSeconds(bestDuration),
+        detail: 'longest interval',
+      })
+      cards.push({
+        label: 'Workout time',
+        value: formatDurationSeconds(totalDuration),
+        detail: 'total duration',
+      })
+      break
+    }
+  }
+
+  return cards
+}
+
 function formatPersonalBestValue(
   kind: ReturnType<typeof buildWorkoutPersonalBestCandidates>[number]['kind'],
   value: number,
@@ -127,6 +235,7 @@ export function WorkoutResultsScreen({
   preferences,
   onRepeatWorkout,
   onSaveAsTemplate,
+  onDeleteWorkout,
   onUpdateWorkout,
   onUpdateWorkoutExerciseNotes,
   onUpdateLoggedSet,
@@ -183,6 +292,16 @@ export function WorkoutResultsScreen({
             ) : null}
             {isEditing ? (
               <>
+                <button
+                  className="ghost-button danger"
+                  onClick={() => {
+                    if (window.confirm('Delete this workout? This cannot be undone.')) {
+                      void onDeleteWorkout(currentWorkout.id)
+                    }
+                  }}
+                >
+                  Delete workout
+                </button>
                 <button
                   className="ghost-button compact-icon-button"
                   onClick={() => {
@@ -469,7 +588,38 @@ export function WorkoutResultsScreen({
                       ))}
                     </div>
                   </div>
-                ) : null}
+                ) : (
+                  <div className="stack compact">
+                    <div className="grid-list compact-progress-points">
+                      {buildExerciseSummaryCards(trackingMode, item, unit).map((card) => (
+                        <div className="results-summary-tile" key={`${item.workoutExercise.id}-${card.label}`}>
+                          <strong>{card.value}</strong>
+                          <p>{card.label}</p>
+                          <p>{card.detail}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="stack compact">
+                      {item.sets.map((set, index) => (
+                        <div
+                          className={
+                            set.completedAt
+                              ? set.setKind === 'warmup'
+                                ? 'results-set-row done warmup'
+                                : 'results-set-row done'
+                              : set.setKind === 'warmup'
+                                ? 'results-set-row warmup'
+                                : 'results-set-row'
+                          }
+                          key={`${item.workoutExercise.id}-${set.id}`}
+                        >
+                          <strong>{`Set ${index + 1}${set.setKind === 'warmup' ? ' • WU' : ''}`}</strong>
+                          <p>{formatWorkoutSetLine(trackingMode, set, displayWeightUnit)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}

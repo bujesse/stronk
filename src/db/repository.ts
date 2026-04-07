@@ -1047,6 +1047,66 @@ export async function removeExerciseFromWorkout(workoutExerciseId: string) {
   }
 }
 
+export async function removeWorkout(workoutId: string) {
+  const workout = await db.workouts.get(workoutId)
+  if (!workout) {
+    return
+  }
+
+  const timestamp = nowIso()
+  const workoutExercises = (await db.workoutExercises.where({ workoutId }).toArray()).filter(
+    (item) => item.deletedAt == null,
+  )
+  const workoutExerciseIds = new Set(workoutExercises.map((item) => item.id))
+  const loggedSets = (await db.loggedSets.toArray()).filter(
+    (set) => set.deletedAt == null && workoutExerciseIds.has(set.workoutExerciseId),
+  )
+
+  await db.transaction(
+    'rw',
+    [db.workouts, db.workoutExercises, db.loggedSets, db.preferences, db.syncQueue],
+    async () => {
+      const deletedWorkout: Workout = {
+        ...workout,
+        deletedAt: timestamp,
+        updatedAt: timestamp,
+        syncStatus: 'pending',
+      }
+
+      await db.workouts.put(deletedWorkout)
+      await queue('workout', deletedWorkout.id, 'delete', deletedWorkout)
+
+      for (const workoutExercise of workoutExercises) {
+        const deletedWorkoutExercise: WorkoutExercise = {
+          ...workoutExercise,
+          deletedAt: timestamp,
+          updatedAt: timestamp,
+          syncStatus: 'pending',
+        }
+
+        await db.workoutExercises.put(deletedWorkoutExercise)
+        await queue('workoutExercise', deletedWorkoutExercise.id, 'delete', deletedWorkoutExercise)
+      }
+
+      for (const loggedSet of loggedSets) {
+        const deletedLoggedSet: LoggedSet = {
+          ...loggedSet,
+          deletedAt: timestamp,
+          updatedAt: timestamp,
+          syncStatus: 'pending',
+        }
+
+        await db.loggedSets.put(deletedLoggedSet)
+        await queue('loggedSet', deletedLoggedSet.id, 'delete', deletedLoggedSet)
+      }
+
+      if (workout.status === 'active') {
+        await savePreferences({ activeTimerEndAt: null })
+      }
+    },
+  )
+}
+
 export async function completeWorkout(workoutId: string) {
   const workout = await db.workouts.get(workoutId)
   if (!workout) {
