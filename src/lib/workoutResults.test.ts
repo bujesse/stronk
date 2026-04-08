@@ -25,7 +25,13 @@ function createWorkoutWithDetails(params: {
   startedAt: string
   endedAt: string
   exercise: Exercise
-  sets: Array<{ reps?: number; weight?: number; assistanceWeight?: number; durationSeconds?: number }>
+  sets: Array<{
+    reps?: number
+    weight?: number
+    assistanceWeight?: number
+    durationSeconds?: number
+    setKind?: 'normal' | 'warmup'
+  }>
 }): WorkoutWithDetails {
   return {
     workout: {
@@ -61,7 +67,7 @@ function createWorkoutWithDetails(params: {
           workoutExerciseId: `${params.id}_exercise`,
           plannedSetId: null,
           sortOrder: index,
-          setKind: 'normal',
+          setKind: set.setKind ?? 'normal',
           reps: set.reps ?? null,
           weight: set.weight ?? null,
           assistanceWeight: set.assistanceWeight ?? null,
@@ -95,6 +101,40 @@ describe('workoutResults', () => {
       repsTotal: 13,
       volumeTotal: 1220,
     })
+  })
+
+  it('excludes warmup sets from summary totals and PR comparisons', () => {
+    const exercise = createExercise('rdl', 'Romanian Deadlift', 'Barbell', 'weight_reps')
+    const previous = createWorkoutWithDetails({
+      id: 'prev',
+      startedAt: '2026-04-01T10:00:00.000Z',
+      endedAt: '2026-04-01T10:45:00.000Z',
+      exercise,
+      sets: [{ reps: 5, weight: 100 }],
+    })
+    const current = createWorkoutWithDetails({
+      id: 'cur',
+      startedAt: '2026-04-05T10:00:00.000Z',
+      endedAt: '2026-04-05T10:45:00.000Z',
+      exercise,
+      sets: [
+        { reps: 20, weight: 120, setKind: 'warmup' },
+        { reps: 5, weight: 100 },
+      ],
+    })
+
+    expect(summarizeWorkout(current)).toMatchObject({
+      completedSetCount: 1,
+      workingSetCount: 1,
+      warmupCount: 1,
+      repsTotal: 5,
+      volumeTotal: 500,
+    })
+
+    const prs = buildWorkoutPersonalBestCandidates(current, [previous, current])
+    expect(prs.some((entry) => entry.label === 'Heaviest load')).toBe(false)
+    expect(prs.some((entry) => entry.label === 'Best set volume')).toBe(false)
+    expect(prs.some((entry) => entry.label === 'Best workout volume')).toBe(false)
   })
 
   it('detects multiple weight-based PR categories against prior history', () => {

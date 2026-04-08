@@ -1,5 +1,5 @@
 import { SectionCard } from '../../components/SectionCard'
-import { formatShortDate, minutesBetween } from '../../lib/time'
+import { formatDateTime, formatShortDate } from '../../lib/time'
 import { formatExerciseBest, pluralize } from '../../lib/format'
 import type { ExerciseAnalytics, Preferences, TemplateWithDetails, WorkoutWithDetails } from '../../lib/types'
 
@@ -75,8 +75,8 @@ export function DashboardScreen({
           </div>
           <div className="metric-card">
             <span>Last session</span>
-            <strong>{recent ? minutesBetween(recent.workout.startedAt, recent.workout.endedAt) : 0}</strong>
-            <p>minutes</p>
+            <strong>{recent ? formatDateTime(recent.workout.startedAt) : 'None yet'}</strong>
+            <p>{recent ? 'start time' : 'complete a workout'}</p>
           </div>
         </div>
         <div className="stack compact">

@@ -66,7 +66,7 @@ export function QuickWorkoutBuilder({
               })}
             </div>
           ) : (
-            <p className="empty-state">Add exercises to build your quick workout.</p>
+            <p className="empty-state">Start empty if you want and add exercises once the workout is live.</p>
           )}
           <button className="primary-button" onClick={() => void onStart()}>
             Start quick workout

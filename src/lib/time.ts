@@ -37,6 +37,24 @@ export function minutesBetween(startAt: string, endAt: string | null) {
   return Math.max(1, Math.round((end - new Date(startAt).getTime()) / 60000))
 }
 
+export function formatElapsedCompact(startAt: string, endAt: string | null = null) {
+  const end = endAt ? new Date(endAt).getTime() : Date.now()
+  const totalMinutes = Math.max(0, Math.floor((end - new Date(startAt).getTime()) / 60000))
+
+  if (totalMinutes < 60) {
+    return `${Math.max(1, totalMinutes)}m`
+  }
+
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+
+  if (minutes === 0) {
+    return `${hours}h`
+  }
+
+  return `${hours}h ${minutes}m`
+}
+
 export function formatDurationSeconds(value: number | null) {
   if (value == null) {
     return '0:00'

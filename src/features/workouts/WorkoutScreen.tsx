@@ -9,7 +9,9 @@ import {
 } from 'lucide-react'
 import { DropdownField } from '../../components/DropdownField'
 import { SectionCard } from '../../components/SectionCard'
+import { ProgressionModal } from '../history/ProgressionModal'
 import { useAnimatedList } from '../../hooks/useAnimatedList'
+import { useNow } from '../../hooks/useNow'
 import { useTicker } from '../../hooks/useTicker'
 import { NoteModal } from './NoteModal'
 import { QuickWorkoutBuilder } from './QuickWorkoutBuilder'
@@ -22,6 +24,7 @@ import {
 import { formatDurationFromNow, formatShortDate } from '../../lib/time'
 import type {
   Exercise,
+  ExerciseAnalytics,
   ExerciseNoteEntry,
   Preferences,
   WorkoutNoteEntry,
@@ -31,6 +34,8 @@ import type {
 interface WorkoutScreenProps {
   activeWorkout: WorkoutWithDetails | null
   exercises: Exercise[]
+  history: WorkoutWithDetails[]
+  analytics: ExerciseAnalytics[]
   preferences: Preferences | null
   timerEndAt: string | null
   noteHistory: WorkoutNoteEntry[]
@@ -74,6 +79,8 @@ interface WorkoutScreenProps {
 export function WorkoutScreen({
   activeWorkout,
   exercises,
+  history,
+  analytics,
   preferences,
   timerEndAt,
   noteHistory,
@@ -93,6 +100,7 @@ export function WorkoutScreen({
   onCancelRestTimer,
 }: WorkoutScreenProps) {
   useTicker(1000, timerEndAt != null)
+  const now = useNow(1000, timerEndAt != null)
   const [workoutExerciseListRef] = useAnimatedList()
 
   const [quickName, setQuickName] = useState('')
@@ -104,12 +112,9 @@ export function WorkoutScreen({
   const [exerciseNoteDraft, setExerciseNoteDraft] = useState('')
   const [isWorkoutNoteOpen, setIsWorkoutNoteOpen] = useState(false)
   const [workoutNoteDraft, setWorkoutNoteDraft] = useState('')
+  const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null)
 
   async function startQuickWorkout() {
-    if (selectedExerciseIds.length === 0) {
-      return
-    }
-
     await onCreateQuickWorkout(quickName, selectedExerciseIds)
     setQuickName('')
     setSelectedExerciseIds([])
@@ -136,6 +141,17 @@ export function WorkoutScreen({
       />
     )
   }
+
+  const selectedAnalyticsEntry =
+    selectedExerciseId != null
+      ? analytics.find((entry) => entry.exerciseId === selectedExerciseId) ?? null
+      : null
+  const selectedExercise =
+    selectedExerciseId != null
+      ? exercises.find((entry) => entry.id === selectedExerciseId) ?? null
+      : null
+  const isTimerExpired =
+    timerEndAt != null ? new Date(timerEndAt).getTime() <= now : false
 
   return (
     <div className="stack">
@@ -166,7 +182,9 @@ export function WorkoutScreen({
             </p>
           </div>
           <div className="hero-card-actions">
-            <div className="timer-chip">{formatDurationFromNow(timerEndAt)}</div>
+            <div className={isTimerExpired ? 'timer-chip timer-chip-ready' : 'timer-chip'}>
+              {isTimerExpired ? 'Rest done' : formatDurationFromNow(timerEndAt)}
+            </div>
             {timerEndAt ? (
               <button className="ghost-button compact-button" onClick={onCancelRestTimer}>
                 Clear
@@ -183,7 +201,7 @@ export function WorkoutScreen({
       </SectionCard>
 
       <div className="floating-select-card">
-        <SectionCard title="Add exercise" description="Drop movements into the current session without leaving the workout.">
+        <SectionCard title="Add exercise">
           <div className="inline-actions align-end add-exercise-row">
             <DropdownField
               label="Exercise"
@@ -233,6 +251,7 @@ export function WorkoutScreen({
             onRemoveSet={onRemoveSet}
             onMoveExercise={onMoveExercise}
             onUpdateExercise={onUpdateExercise}
+            onOpenProgression={() => setSelectedExerciseId(exercise.id)}
           />
         ))}
       </div>
@@ -268,6 +287,40 @@ export function WorkoutScreen({
           }}
         />
       ) : null}
+
+      {selectedAnalyticsEntry ? (
+        <ProgressionModal
+          entry={selectedAnalyticsEntry}
+          history={history}
+          preferences={preferences}
+          onClose={() => setSelectedExerciseId(null)}
+        />
+      ) : selectedExercise ? (
+        <div className="modal-backdrop" onClick={() => setSelectedExerciseId(null)} role="presentation">
+          <div
+            className="modal-card"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="empty-progress-title"
+          >
+            <div className="modal-header">
+              <div>
+                <strong id="empty-progress-title">{formatExerciseName(selectedExercise)}</strong>
+                <p>No completed history yet</p>
+              </div>
+            </div>
+            <div className="info-callout">
+              Finish at least one workout with this exercise to see progression history and charts.
+            </div>
+            <div className="modal-actions">
+              <button className="primary-button" onClick={() => setSelectedExerciseId(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -288,6 +341,7 @@ interface WorkoutExerciseCardProps {
   onRemoveSet: WorkoutScreenProps['onRemoveSet']
   onMoveExercise: WorkoutScreenProps['onMoveExercise']
   onUpdateExercise: WorkoutScreenProps['onUpdateExercise']
+  onOpenProgression: () => void
 }
 
 function WorkoutExerciseCard({
@@ -306,6 +360,7 @@ function WorkoutExerciseCard({
   onRemoveSet,
   onMoveExercise,
   onUpdateExercise,
+  onOpenProgression,
 }: WorkoutExerciseCardProps) {
   const [setGridRef] = useAnimatedList()
   const displayWeightUnit = getExerciseDisplayWeightUnit(exercise, preferences?.weightUnit ?? 'lb')
@@ -327,7 +382,11 @@ function WorkoutExerciseCard({
 
   return (
     <SectionCard
-      title={formatExerciseName(exercise)}
+      title={
+        <button className="section-title-button" onClick={onOpenProgression}>
+          {formatExerciseName(exercise)}
+        </button>
+      }
       description={`${sets.length} planned sets`}
       action={<div className="section-actions exercise-card-actions">
         <button

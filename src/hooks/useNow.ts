@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
-export function useTicker(intervalMs = 1000, enabled = true) {
-  const [tick, setTick] = useState(0)
+export function useNow(intervalMs = 1000, enabled = true) {
+  const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
     if (!enabled) {
@@ -9,7 +9,7 @@ export function useTicker(intervalMs = 1000, enabled = true) {
     }
 
     const interval = window.setInterval(() => {
-      setTick((value) => value + 1)
+      setNow(Date.now())
     }, intervalMs)
 
     return () => {
@@ -17,5 +17,5 @@ export function useTicker(intervalMs = 1000, enabled = true) {
     }
   }, [enabled, intervalMs])
 
-  return tick
+  return now
 }

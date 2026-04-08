@@ -43,16 +43,20 @@
 
 - The active workout must recover after refresh.
 - The rest timer must continue counting based on timestamps, not intervals alone.
-- Keep forms short and inline on mobile.
+- Keep core logging forms short and inline on mobile.
+- Secondary configuration flows such as exercise create/edit/clone should prefer a shared modal over inline page-jump editing.
 - On desktop, prefer single-row set entry where practical; on mobile, compress controls without hiding finish/copy/remove.
 - Use pounds by default; support kilograms as a preference.
+- Exercises may keep their own preferred unit override instead of always following the global unit.
 - Render only the fields relevant to the exercise tracking mode in templates and live workout logging.
 - Duration exercises should not force reps or load fields in template or workout entry UIs.
 - Warmup sets are first-class set records, not transient UI tags; preserve them in templates and logged workouts, but exclude them from progression metrics.
 - Workout notes belong to the workout session record; use them for context like bands, pain notes, or setup cues, and surface the most recent prior note for recurring workouts.
 - Exercise-specific setup cues belong on the workout-exercise record so each logged movement can carry its own last-note recall and note history.
 - Progression views must stay mode-aware; do not compare bodyweight, assisted, and loaded movements with one generic “best weight” rule.
+- Progression lists should stay compact; detailed charts and per-session breakdowns belong in a drill-in modal, not inline on the main page.
 - When creating or seeding exercises, prefer the structured taxonomy format such as `Arms > Triceps` or `Back > Lats` in display terms, backed by separate stored fields.
+- Workout results should remain editable after completion, including metadata and logged sets.
 - Signed-in users should not have to manually export or import data between devices; sync should remain local-first but converge through push + pull through PocketBase.
 - The default self-hosted deployment target is the repo `docker compose` stack: PocketBase, one-shot collection bootstrap, and the Stronk web container.
 

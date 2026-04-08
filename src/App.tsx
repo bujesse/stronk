@@ -52,12 +52,14 @@ import {
 } from './db/repository'
 import { runSync } from './sync/runSync'
 import { useAuthSession } from './hooks/useAuthSession'
+import { useTicker } from './hooks/useTicker'
 import {
   isPocketBaseConfigured,
   signInWithPassword,
   signOut,
   signUpWithPassword,
 } from './sync/client'
+import { formatElapsedCompact } from './lib/time'
 import './index.css'
 
 type TabId = 'dashboard' | 'workout' | 'templates' | 'history' | 'settings'
@@ -86,6 +88,7 @@ const routeToTab: Array<{ path: string; id: TabId }> = [
 
 function App() {
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
+  useTicker(30000, true)
   const location = useLocation()
   const navigate = useNavigate()
   const { session, ready: authReady } = useAuthSession()
@@ -116,7 +119,10 @@ function App() {
   const templates = useLiveQuery(() => listTemplates(), [], [])
   const activeWorkout = useLiveQuery(() => getActiveWorkout(), [], null)
   const history = useLiveQuery(
-    () => (activeTab === 'dashboard' || activeTab === 'history' ? listWorkoutHistory() : Promise.resolve([])),
+    () =>
+      activeTab === 'dashboard' || activeTab === 'history' || activeTab === 'workout'
+        ? listWorkoutHistory()
+        : Promise.resolve([]),
     [activeTab],
     [],
   )
@@ -153,7 +159,7 @@ function App() {
 
   const status = useMemo(() => {
     if (activeWorkout) {
-      return 'Workout live'
+      return `Workout live · ${formatElapsedCompact(activeWorkout.workout.startedAt)}`
     }
 
     if (pendingSyncCount > 0) {
@@ -231,6 +237,8 @@ function App() {
           <WorkoutScreen
             activeWorkout={activeWorkout}
             exercises={exercises}
+            history={history}
+            analytics={analytics}
             preferences={preferences}
             timerEndAt={preferences?.activeTimerEndAt ?? null}
             noteHistory={workoutNoteHistory}
