@@ -112,6 +112,16 @@ h1 {
   border: 0;
 }
 
+.floating-status-pill {
+  position: sticky;
+  top: 0.75rem;
+  z-index: 40;
+  justify-self: end;
+  margin-bottom: 0.25rem;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
 .content,
 .stack {
   display: grid;
@@ -134,6 +144,33 @@ h1 {
 .floating-select-card {
   position: relative;
   z-index: 30;
+}
+
+.workout-sticky-stack {
+  position: sticky;
+  top: 0.75rem;
+  z-index: 35;
+}
+
+.sticky-timer-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: rgba(20, 14, 10, 0.92);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.sticky-timer-label {
+  margin: 0;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-strong);
 }
 
 .section-header {
@@ -657,9 +694,9 @@ h1 {
   justify-content: space-between;
   gap: 0.8rem;
   position: sticky;
-  top: 0;
+  top: -1rem;
   z-index: 1;
-  margin: -1rem -1rem 0;
+  margin: 0 -1rem;
   padding: 1rem 1rem 0.2rem;
   background: rgba(24, 17, 13, 0.98);
 }
@@ -883,6 +920,10 @@ h1 {
   .content > *:first-child:last-child {
     grid-column: 1 / -1;
   }
+
+  .workout-sticky-stack {
+    top: 1rem;
+  }
 }
 
 @media (max-width: 719px) {
@@ -894,6 +935,15 @@ h1 {
   .status-pill {
     width: 100%;
     text-align: center;
+  }
+
+  .floating-status-pill {
+    width: auto;
+    justify-self: stretch;
+  }
+
+  .sticky-timer-card {
+    gap: 0.7rem;
   }
 
   .stats-grid {
@@ -919,7 +969,7 @@ h1 {
   .set-actions {
     grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     width: 100%;
   }
 

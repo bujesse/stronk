@@ -1,0 +1,26 @@
+session_name: "stronk"
+windows:
+  - layout: cade,252x57,0,0,1
+    options: {}
+    panes:
+      - focus: "true"
+        shell_command: n -S ~/.cache/nvim/sessions/stronk
+    start_directory: /home/bujesse/dev/stronk
+    window_name: nvim
+  - focus: "true"
+    layout: b376,252x57,0,0{126x57,0,0,4,125x57,127,0[125x28,127,0,5,125x28,127,29,6]}
+    options: {}
+    panes:
+      - focus: "true"
+        shell_command: codex resume --yolo
+      - VITE_POCKETBASE_URL=http://localhost:8090 pnpm dev
+      - l
+    start_directory: /home/bujesse/dev/stronk
+    window_name: run
+  - layout: cae4,252x57,0,0,7
+    options: {}
+    panes:
+      - focus: "true"
+        shell_command: docker compose up pocketbase
+    start_directory: /home/bujesse/dev/stronk
+    window_name: docker

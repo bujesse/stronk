@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { SectionCard } from '../../components/SectionCard'
+import { ProgressionModal } from '../history/ProgressionModal'
 import { formatDateTime, formatShortDate } from '../../lib/time'
 import { formatExerciseBest, pluralize } from '../../lib/format'
 import type { ExerciseAnalytics, Preferences, TemplateWithDetails, WorkoutWithDetails } from '../../lib/types'
@@ -20,8 +22,13 @@ export function DashboardScreen({
   preferences,
   onStartTemplate,
 }: DashboardScreenProps) {
+  const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null)
   const recent = history[0]
   const leaders = analytics.slice(0, 3)
+  const selectedEntry =
+    selectedExerciseId != null
+      ? analytics.find((entry) => entry.exerciseId === selectedExerciseId) ?? null
+      : null
 
   return (
     <div className="stack">
@@ -81,7 +88,11 @@ export function DashboardScreen({
         </div>
         <div className="stack compact">
           {leaders.map((entry) => (
-            <div className="insight-row" key={entry.exerciseId}>
+            <button
+              className="insight-row interactive left-align"
+              key={entry.exerciseId}
+              onClick={() => setSelectedExerciseId(entry.exerciseId)}
+            >
               <div>
                 <strong>{entry.exerciseName}</strong>
                 <p>{pluralize(entry.totalSessions, 'session')}</p>
@@ -90,10 +101,19 @@ export function DashboardScreen({
                 <strong>{formatExerciseBest(entry, preferences?.weightUnit ?? 'lb')}</strong>
                 <p>best marker</p>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </SectionCard>
+
+      {selectedEntry ? (
+        <ProgressionModal
+          entry={selectedEntry}
+          history={history}
+          preferences={preferences}
+          onClose={() => setSelectedExerciseId(null)}
+        />
+      ) : null}
     </div>
   )
 }

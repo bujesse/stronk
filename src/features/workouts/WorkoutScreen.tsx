@@ -174,13 +174,17 @@ export function WorkoutScreen({
           </div>
         }
       >
-        <div className="hero-card">
-          <div>
-            <strong>Rest timer</strong>
-            <p>
-              Default {preferences?.defaultRestSeconds ?? 120}s between completed sets
-            </p>
+        {noteHistory[0] ? (
+          <div className="embedded-card workout-note-preview">
+            <strong>Last note from this workout</strong>
+            <p>{formatShortDate(noteHistory[0].startedAt)} • {noteHistory[0].note}</p>
           </div>
+        ) : null}
+      </SectionCard>
+
+      <div className="workout-sticky-stack">
+        <div className="sticky-timer-card">
+          <strong className="sticky-timer-label">Rest</strong>
           <div className="hero-card-actions">
             <div className={isTimerExpired ? 'timer-chip timer-chip-ready' : 'timer-chip'}>
               {isTimerExpired ? 'Rest done' : formatDurationFromNow(timerEndAt)}
@@ -192,13 +196,7 @@ export function WorkoutScreen({
             ) : null}
           </div>
         </div>
-        {noteHistory[0] ? (
-          <div className="embedded-card workout-note-preview">
-            <strong>Last note from this workout</strong>
-            <p>{formatShortDate(noteHistory[0].startedAt)} • {noteHistory[0].note}</p>
-          </div>
-        ) : null}
-      </SectionCard>
+      </div>
 
       <div className="floating-select-card">
         <SectionCard title="Add exercise">

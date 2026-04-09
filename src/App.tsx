@@ -158,7 +158,7 @@ function App() {
   )
 
   const status = useMemo(() => {
-    if (activeWorkout) {
+    if (activeWorkout && activeTab !== 'workout') {
       return `Workout live · ${formatElapsedCompact(activeWorkout.workout.startedAt)}`
     }
 
@@ -167,7 +167,7 @@ function App() {
     }
 
     return null
-  }, [activeWorkout, pendingSyncCount])
+  }, [activeTab, activeWorkout, pendingSyncCount])
 
   async function handleRunSync() {
     const result = await runSync()
@@ -405,6 +405,7 @@ function App() {
     <AppShell
       title={workoutResultId ? 'Results' : routes[activeTab].title}
       status={status}
+      stickyStatus={Boolean(activeWorkout && activeTab !== 'workout')}
       onStatusClick={activeWorkout ? () => navigate(routes.workout.path) : undefined}
       footer={
         <>
