@@ -135,7 +135,6 @@ It uses:
 
 - [docker-compose.prod.yml](/home/bujesse/dev/stronk/docker-compose.prod.yml)
 - a host bind mount for PocketBase data
-- a backup step before each deploy
 - your self-hosted GitHub Actions runner
 
 #### 1. Put the repo on the runner machine

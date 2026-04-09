@@ -20,6 +20,7 @@ import {
   addExerciseToWorkout,
   addSetToWorkoutExercise,
   cancelRestTimer,
+  completeAllSetsInWorkout,
   completeWorkout,
   createExercise,
   createQuickWorkout,
@@ -279,6 +280,9 @@ function App() {
             onCompleteWorkout={async (workoutId) => {
               await completeWorkout(workoutId)
               navigate(`${routes.history.path}/${encodeURIComponent(workoutId)}`)
+            }}
+            onCompleteAllSetsInWorkout={async (workoutId) => {
+              await completeAllSetsInWorkout(workoutId)
             }}
             onCancelRestTimer={async () => {
               await cancelRestTimer()

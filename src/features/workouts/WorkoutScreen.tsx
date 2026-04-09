@@ -73,6 +73,7 @@ interface WorkoutScreenProps {
     },
   ) => Promise<void>
   onCompleteWorkout: (workoutId: string) => Promise<void>
+  onCompleteAllSetsInWorkout: (workoutId: string) => Promise<void>
   onCancelRestTimer: () => Promise<void>
 }
 
@@ -97,6 +98,7 @@ export function WorkoutScreen({
   onRemoveExerciseFromWorkout,
   onUpdateExercise,
   onCompleteWorkout,
+  onCompleteAllSetsInWorkout,
   onCancelRestTimer,
 }: WorkoutScreenProps) {
   useTicker(1000, timerEndAt != null)
@@ -113,6 +115,7 @@ export function WorkoutScreen({
   const [isWorkoutNoteOpen, setIsWorkoutNoteOpen] = useState(false)
   const [workoutNoteDraft, setWorkoutNoteDraft] = useState('')
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null)
+  const [isFinishConfirmOpen, setIsFinishConfirmOpen] = useState(false)
 
   async function startQuickWorkout() {
     await onCreateQuickWorkout(quickName, selectedExerciseIds)
@@ -152,6 +155,14 @@ export function WorkoutScreen({
       : null
   const isTimerExpired =
     timerEndAt != null ? new Date(timerEndAt).getTime() <= now : false
+  const unfinishedSetCount = activeWorkout.items.reduce(
+    (count, item) => count + item.sets.filter((set) => set.completedAt == null).length,
+    0,
+  )
+
+  async function finishWorkout() {
+    await onCompleteWorkout(activeWorkout!.workout.id)
+  }
 
   return (
     <div className="stack">
@@ -254,9 +265,67 @@ export function WorkoutScreen({
         ))}
       </div>
 
-      <button className="primary-button large" onClick={() => onCompleteWorkout(activeWorkout.workout.id)}>
+      <button
+        className="primary-button large"
+        onClick={() => {
+          if (unfinishedSetCount > 0) {
+            setIsFinishConfirmOpen(true)
+            return
+          }
+
+          void finishWorkout()
+        }}
+      >
         Finish workout
       </button>
+
+      {isFinishConfirmOpen ? (
+        <div className="modal-backdrop" onClick={() => setIsFinishConfirmOpen(false)} role="presentation">
+          <div
+            className="modal-card"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="finish-confirm-title"
+          >
+            <div className="modal-header">
+              <div>
+                <strong id="finish-confirm-title">Unfinished sets</strong>
+                <p>
+                  {unfinishedSetCount} set{unfinishedSetCount === 1 ? '' : 's'} still not marked done.
+                </p>
+              </div>
+            </div>
+            <div className="info-callout">
+              Finish the workout as-is, or mark every remaining set done first.
+            </div>
+            <div className="modal-actions finish-confirm-actions">
+              <button className="ghost-button" onClick={() => setIsFinishConfirmOpen(false)}>
+                Cancel
+              </button>
+              <button
+                className="ghost-button"
+                onClick={() => {
+                  setIsFinishConfirmOpen(false)
+                  void finishWorkout()
+                }}
+              >
+                Finish anyway
+              </button>
+              <button
+                className="primary-button"
+                onClick={async () => {
+                  await onCompleteAllSetsInWorkout(activeWorkout.workout.id)
+                  setIsFinishConfirmOpen(false)
+                  await finishWorkout()
+                }}
+              >
+                Complete all
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {editingExerciseNote ? (
         <NoteModal

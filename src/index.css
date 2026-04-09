@@ -707,6 +707,10 @@ h1 {
   gap: 0.6rem;
 }
 
+.finish-confirm-actions {
+  flex-wrap: wrap;
+}
+
 .modal-close-button {
   flex: 0 0 auto;
 }

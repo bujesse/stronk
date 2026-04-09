@@ -1126,6 +1126,33 @@ export async function completeWorkout(workoutId: string) {
   await savePreferences({ activeTimerEndAt: null })
 }
 
+export async function completeAllSetsInWorkout(workoutId: string) {
+  const timestamp = nowIso()
+  const workoutExercises = (await db.workoutExercises.where({ workoutId }).toArray())
+    .filter((item) => item.deletedAt == null)
+  const workoutExerciseIds = new Set(workoutExercises.map((item) => item.id))
+  const loggedSets = (await db.loggedSets.toArray()).filter(
+    (item) =>
+      item.deletedAt == null &&
+      workoutExerciseIds.has(item.workoutExerciseId) &&
+      item.completedAt == null,
+  )
+
+  await db.transaction('rw', [db.loggedSets, db.syncQueue], async () => {
+    for (const loggedSet of loggedSets) {
+      const next: LoggedSet = {
+        ...loggedSet,
+        completedAt: timestamp,
+        updatedAt: timestamp,
+        syncStatus: 'pending',
+      }
+
+      await db.loggedSets.put(next)
+      await queue('loggedSet', next.id, 'upsert', next)
+    }
+  })
+}
+
 export async function listWorkoutNoteHistory(workoutId: string): Promise<WorkoutNoteEntry[]> {
   const current = await db.workouts.get(workoutId)
   if (!current) {

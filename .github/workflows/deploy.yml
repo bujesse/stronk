@@ -51,21 +51,6 @@ jobs:
       - name: Ensure PocketBase data dir exists
         run: mkdir -p "${{ secrets.POCKETBASE_DATA_DIR }}"
 
-      - name: Backup PocketBase data
-        env:
-          POCKETBASE_DATA_DIR: ${{ secrets.POCKETBASE_DATA_DIR }}
-        run: |
-          set -euo pipefail
-          data_dir="${POCKETBASE_DATA_DIR}"
-          if [ -d "$data_dir" ] && [ "$(ls -A "$data_dir" 2>/dev/null)" ]; then
-            ts="$(date +'%Y%m%d_%H%M%S')"
-            backup_dir="${data_dir%/}_backup_${ts}"
-            cp -a "$data_dir" "$backup_dir"
-            echo "PocketBase backup created at $backup_dir"
-          else
-            echo "No PocketBase data found yet, skipping backup."
-          fi
-
       - name: Stop old stack
         run: docker compose -f docker-compose.prod.yml down
 
