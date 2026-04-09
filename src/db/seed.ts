@@ -4,6 +4,8 @@ import { nowIso } from '../lib/time'
 const defaults = [
   ['Bench Press', 'Chest', 'Mid Chest', 'Barbell', 'weight_reps', 150],
   ['Bench Press', 'Chest', 'Mid Chest', 'Dumbbell', 'weight_reps', 120],
+  ['Incline Bench Press', 'Chest', 'Upper Chest', 'Barbell', 'weight_reps', 150],
+  ['Incline Bench Press', 'Chest', 'Upper Chest', 'Dumbbell', 'weight_reps', 120],
   ['Bench Press', 'Chest', 'Upper Chest', 'Barbell', 'weight_reps', 150],
   ['Bench Press', 'Chest', 'Upper Chest', 'Dumbbell', 'weight_reps', 120],
   ['Bench Press', 'Chest', 'Lower Chest', 'Barbell', 'weight_reps', 150],

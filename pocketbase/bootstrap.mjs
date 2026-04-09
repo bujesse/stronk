@@ -28,8 +28,18 @@ async function waitForServer() {
   throw new Error('PocketBase did not become ready in time')
 }
 
-await waitForServer()
-await pocketbase.collection('_superusers').authWithPassword(superuserEmail, superuserPassword)
-await pocketbase.collections.import(collections, true)
+async function main() {
+  await waitForServer()
+  await pocketbase.collection('_superusers').authWithPassword(superuserEmail, superuserPassword)
+  await pocketbase.collections.import(collections, true)
+  console.log('PocketBase schema imported')
+}
 
-console.log('PocketBase schema imported')
+main()
+  .then(() => {
+    process.exit(0)
+  })
+  .catch((error) => {
+    console.error(error)
+    process.exit(1)
+  })

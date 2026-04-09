@@ -22,8 +22,7 @@
 
 - UI components do not write directly to PocketBase.
 - All persistence flows through repository functions.
-- This repo is prelaunch: prefer destructive local schema resets over compatibility migrations.
-- Keep the local schema simple and current; do not preserve legacy fields or migration branches once the latest shape is decided.
+- Keep the local schema simple and current, but preserve user data across Dexie upgrades.
 - All user-created entities must carry `id`, `updatedAt`, and `syncStatus`.
 - Use soft deletes for synced entities.
 - Keep queue metadata separate from domain records.
@@ -37,7 +36,8 @@
 - Store load values in the canonical internal unit, then convert at the UI boundary based on preferences.
 - Assisted movements must use a dedicated assistance field, not negative numbers in the main load field.
 - Seed exercise IDs must stay deterministic across installs; do not revert to random IDs for seeded records.
-- When the local Dexie schema changes, bump the DB version and reset/reseed rather than preserving old IndexedDB data.
+- Seed catalog updates should be additive: insert missing seeded exercises automatically, but do not overwrite edited records or wipe user data.
+- When the local Dexie schema changes, bump the DB version and write forward-only migrations/reconciliation instead of resetting IndexedDB.
 
 ## UX Rules
 

@@ -1,0 +1,67 @@
+networks:
+  homelab-public:
+    external: true
+
+services:
+  pocketbase:
+    build:
+      context: .
+      dockerfile: docker/pocketbase.Dockerfile
+    environment:
+      PB_SUPERUSER_EMAIL: ${PB_SUPERUSER_EMAIL}
+      PB_SUPERUSER_PASSWORD: ${PB_SUPERUSER_PASSWORD}
+    ports:
+      - "8092:8090"
+    volumes:
+      - ${POCKETBASE_DATA_DIR}:/pb/pb_data
+    networks:
+      - homelab-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.stronk-pocketbase.entrypoints=https"
+      - "traefik.http.routers.stronk-pocketbase.rule=Host(`${POCKETBASE_PUBLIC_HOST}`)"
+      - "traefik.http.routers.stronk-pocketbase.tls=true"
+      - "traefik.http.routers.stronk-pocketbase.tls.certresolver=production"
+      - "traefik.http.services.stronk-pocketbase.loadbalancer.server.port=8090"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8090/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  pocketbase-bootstrap:
+    build:
+      context: .
+      dockerfile: docker/pocketbase-bootstrap.Dockerfile
+    depends_on:
+      pocketbase:
+        condition: service_healthy
+    environment:
+      POCKETBASE_INTERNAL_URL: http://pocketbase:8090
+      PB_SUPERUSER_EMAIL: ${PB_SUPERUSER_EMAIL}
+      PB_SUPERUSER_PASSWORD: ${PB_SUPERUSER_PASSWORD}
+    networks:
+      - homelab-public
+    restart: "no"
+
+  stronk:
+    build:
+      context: .
+    depends_on:
+      pocketbase-bootstrap:
+        condition: service_completed_successfully
+    ports:
+      - "4173:80"
+    environment:
+      VITE_POCKETBASE_URL: /pb
+    restart: unless-stopped
+    networks:
+      - homelab-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.stronk.entrypoints=https"
+      - "traefik.http.routers.stronk.rule=Host(`${PUBLIC_HOST}`)"
+      - "traefik.http.routers.stronk.tls=true"
+      - "traefik.http.routers.stronk.tls.certresolver=production"
+      - "traefik.http.services.stronk.loadbalancer.server.port=80"

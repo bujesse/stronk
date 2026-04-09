@@ -26,8 +26,9 @@ export class StronkDb extends Dexie {
   constructor() {
     super('stronk-db')
 
-    this.version(1).stores({
-      exercises: 'id, movementName, bodyRegion, muscleGroup, equipment, preferredWeightUnit, updatedAt, deletedAt, isCustom',
+    const stores = {
+      exercises:
+        'id, movementName, bodyRegion, muscleGroup, equipment, preferredWeightUnit, updatedAt, deletedAt, isCustom',
       workoutTemplates: 'id, name, updatedAt, deletedAt',
       templateExercises: 'id, templateId, exerciseId, sortOrder, deletedAt',
       templateSets: 'id, templateExerciseId, sortOrder, deletedAt',
@@ -36,44 +37,25 @@ export class StronkDb extends Dexie {
       loggedSets: 'id, workoutExerciseId, sortOrder, completedAt, deletedAt',
       preferences: 'id',
       syncQueue: 'id, entity, entityId, status, updatedAt',
-    })
+    } as const
 
-    this.version(11)
-      .stores({
-        exercises: 'id, movementName, bodyRegion, muscleGroup, equipment, preferredWeightUnit, updatedAt, deletedAt, isCustom',
-        workoutTemplates: 'id, name, updatedAt, deletedAt',
-        templateExercises: 'id, templateId, exerciseId, sortOrder, deletedAt',
-        templateSets: 'id, templateExerciseId, sortOrder, deletedAt',
-        workouts: 'id, templateId, status, startedAt, updatedAt, deletedAt',
-        workoutExercises: 'id, workoutId, exerciseId, sortOrder, deletedAt',
-        loggedSets: 'id, workoutExerciseId, sortOrder, completedAt, deletedAt',
-        preferences: 'id',
-        syncQueue: 'id, entity, entityId, status, updatedAt',
-      })
-      .upgrade(async (tx) => {
-        await tx.table('templateSets').clear()
-        await tx.table('templateExercises').clear()
-        await tx.table('workoutExercises').clear()
-        await tx.table('loggedSets').clear()
-        await tx.table('workoutTemplates').clear()
-        await tx.table('workouts').clear()
-        await tx.table('syncQueue').clear()
-        await tx.table('exercises').clear()
-        await tx.table('preferences').clear()
+    this.version(1).stores(stores)
 
-        await tx.table('exercises').bulkAdd(createSeedExercises())
-        await tx.table('preferences').add({
-          id: 'preferences',
-          weightUnit: 'lb',
-          defaultRestSeconds: 120,
-          activeTimerEndAt: null,
-          updatedAt: new Date().toISOString(),
-        })
-      })
+    this.version(12).stores(stores)
   }
 }
 
 export const db = new StronkDb()
+
+function createDefaultPreferences(): Preferences {
+  return {
+    id: 'preferences',
+    weightUnit: 'lb',
+    defaultRestSeconds: 120,
+    activeTimerEndAt: null,
+    updatedAt: new Date().toISOString(),
+  }
+}
 
 async function ensureBaseData() {
   const seedExercises = createSeedExercises()
@@ -88,26 +70,14 @@ async function ensureBaseData() {
 
     const preferences = await db.preferences.get('preferences')
     if (!preferences) {
-      await db.preferences.put({
-        id: 'preferences',
-        weightUnit: 'lb',
-        defaultRestSeconds: 120,
-        activeTimerEndAt: null,
-        updatedAt: new Date().toISOString(),
-      })
+      await db.preferences.put(createDefaultPreferences())
     }
   })
 }
 
 db.on('populate', async () => {
   await db.exercises.bulkAdd(createSeedExercises())
-  await db.preferences.add({
-    id: 'preferences',
-    weightUnit: 'lb',
-    defaultRestSeconds: 120,
-    activeTimerEndAt: null,
-    updatedAt: new Date().toISOString(),
-  })
+  await db.preferences.add(createDefaultPreferences())
 })
 
 db.on('ready', () => ensureBaseData())

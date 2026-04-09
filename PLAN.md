@@ -73,6 +73,7 @@
 - All writes land locally first.
 - User-created records use client UUIDs.
 - Seed exercises use deterministic IDs so templates and workout history resolve consistently across devices.
+- Seed reconciliation is additive: future deploys may insert missing seeded exercises, but should not wipe user data or overwrite edited records automatically.
 - Mutations enqueue for later sync.
 - Signed-in devices push queued local mutations and pull the full remote dataset into Dexie.
 - Deletes are soft deletes with tombstones locally and remotely.
@@ -82,11 +83,12 @@
 - Preferences sync only the shared fields (`weightUnit`, `defaultRestSeconds`); active rest timers remain device-local.
 - If PocketBase is not configured, the app remains fully local.
 
-## Prelaunch Data Policy
+## Local Data Policy
 
-- The app is prelaunch and does not preserve local data across schema changes.
-- Dexie schema upgrades should reset local IndexedDB state and reseed defaults instead of carrying migration logic.
-- Do not add backward-compatibility transforms for old local schemas unless explicitly requested later.
+- Local Dexie schema upgrades must preserve user data.
+- Add missing defaults and preferences through startup reconciliation instead of destructive resets.
+- Future seed catalog changes should auto-insert missing exercises without deleting workouts, templates, history, or user-created exercises.
+- Do not reintroduce destructive local schema resets as a normal upgrade path.
 
 ## Milestones
 

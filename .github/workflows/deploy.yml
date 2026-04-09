@@ -1,0 +1,76 @@
+name: Deploy Stronk to Homelab
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write env file
+        run: |
+          cat > .env <<EOF
+          PB_SUPERUSER_EMAIL=${{ secrets.PB_SUPERUSER_EMAIL }}
+          PB_SUPERUSER_PASSWORD=${{ secrets.PB_SUPERUSER_PASSWORD }}
+          POCKETBASE_DATA_DIR=${{ secrets.POCKETBASE_DATA_DIR }}
+          PUBLIC_HOST=${{ secrets.PUBLIC_HOST }}
+          POCKETBASE_PUBLIC_HOST=${{ secrets.POCKETBASE_PUBLIC_HOST }}
+          EOF
+
+      - name: Ensure PocketBase data dir exists
+        run: mkdir -p "${{ secrets.POCKETBASE_DATA_DIR }}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build images
+        run: docker compose -f docker-compose.prod.yml build
+
+  deploy:
+    runs-on: self-hosted
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write env file
+        run: |
+          cat > .env <<EOF
+          PB_SUPERUSER_EMAIL=${{ secrets.PB_SUPERUSER_EMAIL }}
+          PB_SUPERUSER_PASSWORD=${{ secrets.PB_SUPERUSER_PASSWORD }}
+          POCKETBASE_DATA_DIR=${{ secrets.POCKETBASE_DATA_DIR }}
+          PUBLIC_HOST=${{ secrets.PUBLIC_HOST }}
+          POCKETBASE_PUBLIC_HOST=${{ secrets.POCKETBASE_PUBLIC_HOST }}
+          EOF
+
+      - name: Ensure PocketBase data dir exists
+        run: mkdir -p "${{ secrets.POCKETBASE_DATA_DIR }}"
+
+      - name: Backup PocketBase data
+        env:
+          POCKETBASE_DATA_DIR: ${{ secrets.POCKETBASE_DATA_DIR }}
+        run: |
+          set -euo pipefail
+          data_dir="${POCKETBASE_DATA_DIR}"
+          if [ -d "$data_dir" ] && [ "$(ls -A "$data_dir" 2>/dev/null)" ]; then
+            ts="$(date +'%Y%m%d_%H%M%S')"
+            backup_dir="${data_dir%/}_backup_${ts}"
+            cp -a "$data_dir" "$backup_dir"
+            echo "PocketBase backup created at $backup_dir"
+          else
+            echo "No PocketBase data found yet, skipping backup."
+          fi
+
+      - name: Stop old stack
+        run: docker compose -f docker-compose.prod.yml down
+
+      - name: Start stack
+        run: docker compose -f docker-compose.prod.yml up -d
+
+      - name: Show status
+        run: docker compose -f docker-compose.prod.yml ps
