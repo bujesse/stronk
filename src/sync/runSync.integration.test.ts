@@ -1,5 +1,7 @@
 import 'fake-indexeddb/auto'
 import PocketBase from 'pocketbase'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { Preferences } from '../lib/types'
 import {
@@ -8,6 +10,7 @@ import {
   createQuickWorkout,
   getActiveWorkout,
   getPreferences,
+  getWorkoutById,
   listExercises,
   listWorkoutHistory,
   savePreferences,
@@ -16,6 +19,8 @@ import {
 } from '../db/repository'
 import { db } from '../db/appDb'
 import { BASELINE_DATA_TIMESTAMP, createSeedExercises } from '../db/seed'
+import { formatExerciseName } from '../lib/format'
+import { WorkoutResultsScreen } from '../features/history/WorkoutResultsScreen'
 import { nowIso } from '../lib/time'
 import { signInWithPassword, signUpWithPassword, resetPocketBaseClient } from './client'
 import { runSync } from './runSync'
@@ -131,7 +136,7 @@ describe('runSync integration', () => {
 
     await completeWorkout(activeWorkout!.workout.id)
 
-    const firstSync = await runSync()
+    const firstSync = await runSync({ pullMode: 'full' })
     expect(firstSync.ok).toBe(true)
 
     const remoteClient = new PocketBase(pocketbaseUrl)
@@ -151,12 +156,13 @@ describe('runSync integration', () => {
     const signInResult = await signInWithPassword(email, password)
     expect(signInResult.ok).toBe(true)
 
-    const secondSync = await runSync()
+    const secondSync = await runSync({ pullMode: 'full' })
     expect(secondSync.ok).toBe(true)
 
     const syncedExercises = await listExercises()
     const syncedPreferences = await getPreferences()
     const syncedHistory = await listWorkoutHistory(20)
+    const syncedWorkoutById = await getWorkoutById(activeWorkout!.workout.id)
 
     const syncedCustomExercise = syncedExercises.find((exercise) => exercise.id === customExercise.id)
     const syncedBench = syncedExercises.find((exercise) => exercise.id === bench!.id)
@@ -167,8 +173,46 @@ describe('runSync integration', () => {
     expect(syncedBench?.preferredWeightUnit).toBe('kg')
     expect(syncedPreferences?.weightUnit).toBe('kg')
     expect(syncedWorkout?.workout.name).toBe('Sync Test Workout')
+    expect(syncedWorkoutById?.workout.name).toBe('Sync Test Workout')
     expect(syncedWorkout?.items).toHaveLength(2)
     expect(syncedWorkout?.items[0]?.sets[0]?.reps).toBe(8)
     expect(syncedWorkout?.items[1]?.sets[0]?.reps).toBe(12)
+
+    const resultsMarkup = renderToStaticMarkup(
+      createElement(WorkoutResultsScreen, {
+        workout: syncedWorkoutById,
+        history: syncedHistory,
+        preferences: syncedPreferences ?? null,
+        onRepeatWorkout: async () => {},
+        onSaveAsTemplate: async () => {},
+        onDeleteWorkout: async () => {},
+        onUpdateWorkout: async () => {},
+        onUpdateWorkoutExerciseNotes: async () => {},
+        onUpdateLoggedSet: async () => {},
+      }),
+    )
+
+    expect(resultsMarkup).toContain('Sync Test Workout')
+    expect(resultsMarkup).toContain('Exercise summary')
+
+    await db.exercises.delete(bench!.id)
+
+    const degradedWorkout = await getWorkoutById(activeWorkout!.workout.id)
+    const degradedMarkup = renderToStaticMarkup(
+      createElement(WorkoutResultsScreen, {
+        workout: degradedWorkout,
+        history: syncedHistory,
+        preferences: syncedPreferences ?? null,
+        onRepeatWorkout: async () => {},
+        onSaveAsTemplate: async () => {},
+        onDeleteWorkout: async () => {},
+        onUpdateWorkout: async () => {},
+        onUpdateWorkoutExerciseNotes: async () => {},
+        onUpdateLoggedSet: async () => {},
+      }),
+    )
+
+    expect(degradedWorkout?.items.some((item) => item.exercise.id === bench!.id)).toBe(true)
+    expect(degradedMarkup).toContain(formatExerciseName(bench!))
   }, 30000)
 })

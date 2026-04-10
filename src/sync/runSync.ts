@@ -25,6 +25,30 @@ const syncPullOrder = [
 ] as const
 
 type SyncEntityName = (typeof syncPullOrder)[number]
+type PullMode = 'full' | 'incremental'
+
+const pullCheckpointMemory = new Map<string, string>()
+
+function getPullCheckpointKey(userId: string, entity: SyncEntityName) {
+  return `stronk:sync:last-pull:${userId}:${entity}`
+}
+
+function readPullCheckpoint(userId: string, entity: SyncEntityName) {
+  if (typeof window !== 'undefined' && 'localStorage' in window) {
+    return window.localStorage.getItem(getPullCheckpointKey(userId, entity))
+  }
+
+  return pullCheckpointMemory.get(getPullCheckpointKey(userId, entity)) ?? null
+}
+
+function writePullCheckpoint(userId: string, entity: SyncEntityName, updatedAt: string) {
+  if (typeof window !== 'undefined' && 'localStorage' in window) {
+    window.localStorage.setItem(getPullCheckpointKey(userId, entity), updatedAt)
+    return
+  }
+
+  pullCheckpointMemory.set(getPullCheckpointKey(userId, entity), updatedAt)
+}
 
 async function normalizeBaselineLocalRecords() {
   const seedExercises = createSeedExercises()
@@ -178,7 +202,7 @@ async function pushQueuedChanges(userId: string) {
   return { pushedCount, failedCount }
 }
 
-async function pullRemoteChanges() {
+async function pullRemoteChanges(userId: string, mode: PullMode) {
   const pocketbase = getPocketBaseClient()
   if (!pocketbase) {
     return { pulledCount: 0 }
@@ -187,11 +211,24 @@ async function pullRemoteChanges() {
   let pulledCount = 0
 
   for (const entity of syncPullOrder) {
+    const checkpoint = mode === 'incremental' ? readPullCheckpoint(userId, entity) : null
     const rows = await pocketbase.collection(getRemoteTable(entity)).getFullList({
       sort: 'updated_at',
+      ...(checkpoint
+        ? {
+            filter: `updated_at > "${escapeFilterValue(checkpoint)}"`,
+          }
+        : {}),
     })
 
+    let latestSeenUpdatedAt = checkpoint
+
     for (const row of rows) {
+      const rowUpdatedAt = String((row as { updated_at?: string }).updated_at ?? '')
+      if (rowUpdatedAt && (!latestSeenUpdatedAt || isRemoteNewer(latestSeenUpdatedAt, rowUpdatedAt))) {
+        latestSeenUpdatedAt = rowUpdatedAt
+      }
+
       const remoteRecord = deserializeFromRemote(entity, row as Record<string, unknown>)
       const localRecord = await getLocalRecord(entity, remoteRecord.id)
 
@@ -215,12 +252,14 @@ async function pullRemoteChanges() {
         pulledCount += 1
       }
     }
+
+    writePullCheckpoint(userId, entity, latestSeenUpdatedAt ?? new Date().toISOString())
   }
 
   return { pulledCount }
 }
 
-export async function runSync() {
+export async function runSync(options: { pullMode?: PullMode } = {}) {
   try {
     const pocketbase = getPocketBaseClient()
     if (!pocketbase) {
@@ -238,10 +277,11 @@ export async function runSync() {
       }
     }
 
+    const pullMode = options.pullMode ?? 'incremental'
     await normalizeBaselineLocalRecords()
-    const initialPull = await pullRemoteChanges()
+    const initialPull = await pullRemoteChanges(authRecord.id, pullMode)
     const { pushedCount, failedCount } = await pushQueuedChanges(authRecord.id)
-    const finalPull = await pullRemoteChanges()
+    const finalPull = await pullRemoteChanges(authRecord.id, 'incremental')
     const pulledCount = initialPull.pulledCount + finalPull.pulledCount
 
     if (failedCount > 0) {

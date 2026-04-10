@@ -3,8 +3,12 @@ import { createId } from '../lib/id'
 import { nowIso } from '../lib/time'
 import { buildExerciseAnalytics } from '../lib/analytics'
 import { formatExerciseName, getExerciseTrackingMode, toStorageWeight } from '../lib/format'
+import { getPocketBaseClient } from '../sync/client'
+import { deserializeFromRemote, putLocalRecord } from '../sync/schema'
+import { ClientResponseError } from 'pocketbase'
 import type {
   BodyRegion,
+  Exercise,
   ExerciseNoteEntry,
   ExerciseAnalytics,
   LoggedSet,
@@ -20,6 +24,63 @@ import type {
   WorkoutTemplate,
   WorkoutWithDetails,
 } from '../lib/types'
+
+function fallbackExercise(exerciseId: string): Exercise {
+  return {
+    id: exerciseId,
+    movementName: 'Unknown exercise',
+    bodyRegion: null,
+    muscleGroup: null,
+    equipment: null,
+    preferredWeightUnit: null,
+    trackingMode: 'weight_reps',
+    defaultRestSeconds: null,
+    isCustom: false,
+    deletedAt: null,
+    createdAt: '',
+    updatedAt: '',
+    syncStatus: 'synced',
+  }
+}
+
+async function hydrateMissingExercises(exerciseIds: string[]) {
+  const uniqueIds = [...new Set(exerciseIds)]
+  if (uniqueIds.length === 0) {
+    return
+  }
+
+  const localExercises = await db.exercises.bulkGet(uniqueIds)
+  const missingIds = uniqueIds.filter((_exerciseId, index) => {
+    const exercise = localExercises[index]
+    return !exercise || exercise.deletedAt != null
+  })
+
+  if (missingIds.length === 0) {
+    return
+  }
+
+  const pocketbase = getPocketBaseClient()
+  if (!pocketbase?.authStore.isValid) {
+    return
+  }
+
+  await Promise.all(
+    missingIds.map(async (exerciseId) => {
+      try {
+        const row = await pocketbase
+          .collection('exercises')
+          .getFirstListItem(`app_id = "${exerciseId.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`)
+        await putLocalRecord('exercise', deserializeFromRemote('exercise', row as Record<string, unknown>))
+      } catch (error) {
+        if (error instanceof ClientResponseError && error.status === 404) {
+          return
+        }
+
+        throw error
+      }
+    }),
+  )
+}
 
 async function queue(entity: string, entityId: string, operation: 'upsert' | 'delete', payload: object) {
   const timestamp = nowIso()
@@ -378,6 +439,7 @@ export async function listTemplates(): Promise<TemplateWithDetails[]> {
   const templates = (await db.workoutTemplates.toArray()).filter((item) => item.deletedAt == null)
   const templateExercises = (await db.templateExercises.toArray()).filter((item) => item.deletedAt == null)
   const templateSets = (await db.templateSets.toArray()).filter((item) => item.deletedAt == null)
+  await hydrateMissingExercises(templateExercises.map((entry) => entry.exerciseId))
   const exercises = (await db.exercises.toArray()).filter((item) => item.deletedAt == null)
 
   return templates
@@ -387,7 +449,9 @@ export async function listTemplates(): Promise<TemplateWithDetails[]> {
         .sort((left, right) => left.sortOrder - right.sortOrder)
         .map((entry) => ({
           templateExercise: entry,
-          exercise: exercises.find((exercise) => exercise.id === entry.exerciseId)!,
+          exercise:
+            exercises.find((exercise) => exercise.id === entry.exerciseId) ??
+            fallbackExercise(entry.exerciseId),
           sets: templateSets
             .filter((set) => set.templateExerciseId === entry.id)
             .sort((left, right) => left.sortOrder - right.sortOrder),
@@ -653,13 +717,16 @@ async function buildWorkoutWithDetails(workout: Workout): Promise<WorkoutWithDet
     .filter((item) => item.deletedAt == null)
     .sort((left, right) => left.sortOrder - right.sortOrder)
   const loggedSets = (await db.loggedSets.toArray()).filter((item) => item.deletedAt == null)
+  await hydrateMissingExercises(workoutExercises.map((item) => item.exerciseId))
   const exercises = (await db.exercises.toArray()).filter((item) => item.deletedAt == null)
 
   return {
     workout,
     items: workoutExercises.map((workoutExercise) => ({
       workoutExercise,
-      exercise: exercises.find((exercise) => exercise.id === workoutExercise.exerciseId)!,
+      exercise:
+        exercises.find((exercise) => exercise.id === workoutExercise.exerciseId) ??
+        fallbackExercise(workoutExercise.exerciseId),
       sets: loggedSets
         .filter((set) => set.workoutExerciseId === workoutExercise.id)
         .sort((left, right) => left.sortOrder - right.sortOrder),

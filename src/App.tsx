@@ -172,7 +172,7 @@ function App() {
   }, [activeTab, activeWorkout, pendingSyncCount])
 
   async function handleRunSync() {
-    const result = await runSync()
+    const result = await runSync({ pullMode: 'full' })
     setSyncMessage(result.message)
   }
 
@@ -191,7 +191,7 @@ function App() {
     }
 
     lastAutoSyncedUserIdRef.current = session.userId
-    void runSync().then((result) => {
+    void runSync({ pullMode: 'full' }).then((result) => {
       setSyncMessage(result.message)
     })
   }, [authReady, session?.userId])
@@ -203,7 +203,7 @@ function App() {
 
     isAutoSyncingRef.current = true
     const timeoutId = window.setTimeout(() => {
-      void runSync()
+      void runSync({ pullMode: 'incremental' })
         .then((result) => {
           setSyncMessage(result.message)
         })
@@ -382,7 +382,7 @@ function App() {
               const result = await signInWithPassword(email, password)
               setAuthMessage(result.message)
               if (result.ok) {
-                const syncResult = await runSync()
+                const syncResult = await runSync({ pullMode: 'full' })
                 setSyncMessage(syncResult.message)
               }
             }}
@@ -390,7 +390,7 @@ function App() {
               const result = await signUpWithPassword(email, password)
               setAuthMessage(result.message)
               if (result.ok) {
-                const syncResult = await runSync()
+                const syncResult = await runSync({ pullMode: 'full' })
                 setSyncMessage(syncResult.message)
               }
             }}
