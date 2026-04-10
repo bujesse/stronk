@@ -48,7 +48,7 @@ export function WorkoutTimelineGrid({
       : startOfDay(new Date())
     const currentWeekStart = startOfWeek(latestDate)
 
-    return Array.from({ length: 10 }, (_entry, weekIndex) => {
+    return Array.from({ length: 4 }, (_entry, weekIndex) => {
       const weekStart = addDays(currentWeekStart, -weekIndex * 7)
       const days = Array.from({ length: 7 }, (_day, dayIndex) => {
         const dayDate = addDays(weekStart, dayIndex)
@@ -62,7 +62,7 @@ export function WorkoutTimelineGrid({
 
         return {
           date: dayDate,
-          workouts,
+          workout: workouts[0] ?? null,
         }
       })
 
@@ -77,7 +77,6 @@ export function WorkoutTimelineGrid({
     <div className="workout-timeline">
       <div className="workout-timeline-header">
         <strong>Workout map</strong>
-        <p>One dot per completed workout. Hover for a preview, click to open the results.</p>
       </div>
 
       <div className="workout-timeline-day-labels" aria-hidden="true">
@@ -91,29 +90,25 @@ export function WorkoutTimelineGrid({
         {weeks.map((week) => (
           <div className="workout-timeline-row" key={week.weekStart.toISOString()}>
             <div className="workout-timeline-week-label">{formatShortDate(week.weekStart.toISOString())}</div>
-            {week.days.map((day) => (
-              <div className="workout-timeline-cell" key={day.date.toISOString()}>
-                {day.workouts.length === 0 ? (
-                  <div className="workout-timeline-empty" />
-                ) : (
-                  day.workouts.map((entry) => (
-                    <button
-                      key={entry.workout.id}
-                      className={
-                        previewWorkoutId === entry.workout.id
-                          ? 'workout-dot workout-dot-active'
-                          : 'workout-dot'
-                      }
-                      onMouseEnter={() => setPreviewWorkoutId(entry.workout.id)}
-                      onFocus={() => setPreviewWorkoutId(entry.workout.id)}
-                      onClick={() => onOpenWorkout(entry.workout.id)}
-                      title={`${entry.workout.name} • ${formatDateTime(entry.workout.startedAt)}`}
-                      aria-label={`Open ${entry.workout.name} from ${formatDateTime(entry.workout.startedAt)}`}
-                    />
-                  ))
-                )}
-              </div>
-            ))}
+            {week.days.map((day) =>
+              day.workout ? (
+                <button
+                  key={day.date.toISOString()}
+                  className={
+                    previewWorkoutId === day.workout.workout.id
+                      ? 'workout-timeline-cell workout-timeline-cell-filled workout-timeline-cell-active'
+                      : 'workout-timeline-cell workout-timeline-cell-filled'
+                  }
+                  onMouseEnter={() => setPreviewWorkoutId(day.workout!.workout.id)}
+                  onFocus={() => setPreviewWorkoutId(day.workout!.workout.id)}
+                  onClick={() => onOpenWorkout(day.workout!.workout.id)}
+                  title={`${day.workout.workout.name} • ${formatDateTime(day.workout.workout.startedAt)}`}
+                  aria-label={`Open ${day.workout.workout.name} from ${formatDateTime(day.workout.workout.startedAt)}`}
+                />
+              ) : (
+                <div className="workout-timeline-cell" key={day.date.toISOString()} />
+              ),
+            )}
           </div>
         ))}
       </div>

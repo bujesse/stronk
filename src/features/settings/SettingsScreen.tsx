@@ -169,7 +169,7 @@ export function SettingsScreen({
         )}
       </SectionCard>
 
-      <SectionCard title="Sync" description="This device writes locally first, then pushes and pulls the cloud copy.">
+      <SectionCard title="Sync">
         <div className="sync-panel">
           <div>
             <strong>{pendingSyncCount}</strong>
