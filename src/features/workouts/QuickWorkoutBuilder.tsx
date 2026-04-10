@@ -27,7 +27,7 @@ export function QuickWorkoutBuilder({
 
   return (
     <div className="stack">
-      <SectionCard title="Quick workout" description="Build an ad hoc session without making a template.">
+      <SectionCard title="Quick workout">
         <div className="form-grid">
           <input value={quickName} onChange={(event) => onQuickNameChange(event.target.value)} placeholder="Upper body" />
           <div className="inline-actions align-end add-exercise-row">
@@ -65,9 +65,7 @@ export function QuickWorkoutBuilder({
                 )
               })}
             </div>
-          ) : (
-            <p className="empty-state">Start empty if you want and add exercises once the workout is live.</p>
-          )}
+          ) : null}
           <button className="primary-button" onClick={() => void onStart()}>
             Start quick workout
           </button>

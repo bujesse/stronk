@@ -6,7 +6,6 @@ import {
   formatExerciseName,
   formatExerciseMuscleLabel,
   getTrackingModeLabel,
-  pluralize,
 } from '../../lib/format'
 import { BODY_REGION_OPTIONS, getDefaultMuscleGroup } from '../../lib/muscles'
 import type { BodyRegion, Exercise, TrackingMode, WeightUnit } from '../../lib/types'
@@ -147,7 +146,6 @@ export function ExercisesScreen({
     <div className="stack">
       <SectionCard
         title="Library"
-        description={`${pluralize(exercises.length, 'exercise')} ready to use.`}
         action={
           <button className="primary-button" onClick={openCreateModal}>
             Add exercise
@@ -216,7 +214,7 @@ export function ExercisesScreen({
               )
             })
           ) : (
-            <p className="empty-state">No exercises match that filter.</p>
+            <p className="empty-state">No matches.</p>
           )}
         </div>
       </SectionCard>
@@ -235,11 +233,6 @@ export function ExercisesScreen({
                 <strong id="exercise-editor-title">
                   {editingExerciseId ? 'Edit exercise' : 'Add exercise'}
                 </strong>
-                <p className="modal-copy">
-                  {editingExerciseId
-                    ? 'Seeded and custom exercises can both be reconfigured here.'
-                    : 'Keep custom movement names short and obvious.'}
-                </p>
               </div>
               <button
                 className="ghost-button compact-icon-button modal-close-button"

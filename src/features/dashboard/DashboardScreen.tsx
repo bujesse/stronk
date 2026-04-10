@@ -36,7 +36,7 @@ export function DashboardScreen({
   return (
     <div className="stack">
       {activeWorkout ? (
-        <SectionCard title="Active workout" description="Resume exactly where you left off.">
+        <SectionCard title="Active workout">
           <div className="hero-card">
             <div>
               <strong>{activeWorkout.workout.name}</strong>
@@ -50,7 +50,7 @@ export function DashboardScreen({
         </SectionCard>
       ) : null}
 
-      <SectionCard title="Templates" description="Start fast from your saved sessions.">
+      <SectionCard title="Templates">
         <div className="grid-list">
           {templates.slice(0, 3).map(({ template, items }) => (
             <button
@@ -65,28 +65,23 @@ export function DashboardScreen({
               <span>Start</span>
             </button>
           ))}
-          {templates.length === 0 ? (
-            <p className="empty-state">Create a template to start logging in two taps.</p>
-          ) : null}
+          {templates.length === 0 ? <p className="empty-state">No templates yet.</p> : null}
         </div>
       </SectionCard>
 
-      <SectionCard title="Momentum" description="Basic progression cues from completed workouts.">
+      <SectionCard title="Momentum">
         <div className="stats-grid">
           <div className="metric-card">
             <span>Completed</span>
             <strong>{history.length}</strong>
-            <p>tracked workouts</p>
           </div>
           <div className="metric-card">
             <span>PRs tracked</span>
             <strong>{leaders.filter((entry) => entry.personalBestWeight != null).length}</strong>
-            <p>top lifts</p>
           </div>
           <div className="metric-card">
             <span>Last session</span>
             <strong>{recent ? formatDateTime(recent.workout.startedAt) : 'None yet'}</strong>
-            <p>{recent ? 'start time' : 'complete a workout'}</p>
           </div>
         </div>
         <WorkoutTimelineGrid history={history} onOpenWorkout={onOpenWorkout} />

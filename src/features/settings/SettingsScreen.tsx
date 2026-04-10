@@ -86,7 +86,7 @@ export function SettingsScreen({
 
   return (
     <div className="stack">
-      <SectionCard title="Preferences" description="Local settings sync once cloud backup is configured.">
+      <SectionCard title="Preferences">
         <div className="form-grid">
           <DropdownField
             label="Weight unit"
@@ -109,14 +109,7 @@ export function SettingsScreen({
         </div>
       </SectionCard>
 
-      <SectionCard
-        title="Account"
-        description={
-          syncConfigured
-            ? 'Sign in to sync workouts, templates, custom exercises, and preferences across devices.'
-            : 'Add a PocketBase URL to enable sign in and cloud sync.'
-        }
-      >
+      <SectionCard title="Account">
         {!syncConfigured ? (
           <p className="info-callout">Set `VITE_POCKETBASE_URL`.</p>
         ) : !authReady ? (
@@ -171,15 +164,15 @@ export function SettingsScreen({
 
       <SectionCard title="Sync">
         <div className="sync-panel">
-          <div>
+          <div className="sync-status-line">
             <strong>{pendingSyncCount}</strong>
-            <p>queued local changes</p>
+            <span>{pendingSyncCount === 1 ? 'queued change' : 'queued changes'}</span>
+            {syncMessage ? <span className="sync-inline-message">{syncMessage}</span> : null}
           </div>
           <button className="primary-button" onClick={onRunSync} disabled={!syncConfigured || !authSession}>
             Run sync
           </button>
         </div>
-        {syncMessage ? <p className="info-callout">{syncMessage}</p> : null}
       </SectionCard>
 
       <ExercisesScreen

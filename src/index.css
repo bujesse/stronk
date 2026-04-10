@@ -360,6 +360,28 @@ h1 {
   padding: 1rem;
 }
 
+.sync-panel {
+  padding-block: 0.8rem;
+}
+
+.sync-status-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  color: var(--muted);
+}
+
+.sync-status-line strong {
+  color: var(--text);
+}
+
+.sync-inline-message {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .metric-card,
 .analytic-card,
 .embedded-card {

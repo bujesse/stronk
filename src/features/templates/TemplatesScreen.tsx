@@ -182,11 +182,6 @@ export function TemplatesScreen({
     <div className="stack">
       <SectionCard
         title={editingTemplate ? 'Edit template' : 'Build template'}
-        description={
-          editingTemplate
-            ? 'Adjust the copied template before using it again.'
-            : 'Assemble the session you repeat most often.'
-        }
         action={
           editingTemplate ? (
             <button className="ghost-button" onClick={onCancelEditing}>
@@ -249,7 +244,7 @@ export function TemplatesScreen({
         </button>
       </SectionCard>
 
-      <SectionCard title="Saved templates" description={`${pluralize(templates.length, 'template')} ready.`}>
+      <SectionCard title="Saved templates">
         <div className="grid-list">
           {templates.map(({ template, items }) => (
             <article className="list-card" key={template.id}>

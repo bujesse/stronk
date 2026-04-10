@@ -51,7 +51,7 @@ export function HistoryScreen({
 
   return (
     <div className="stack">
-      <SectionCard title="Recent workouts" description="Completed sessions stay on-device and sync when configured.">
+      <SectionCard title="Recent workouts">
         <div className="grid-list">
           {history.map(({ workout, items }) => (
             <button className="list-card interactive left-align" key={workout.id} onClick={() => onOpenWorkout(workout.id)}>
@@ -69,7 +69,7 @@ export function HistoryScreen({
         </div>
       </SectionCard>
 
-      <SectionCard title="Progression" description="Simple exercise trends for load and volume.">
+      <SectionCard title="Progression">
         <div className="form-grid progression-filters">
           <input
             value={query}
@@ -111,7 +111,7 @@ export function HistoryScreen({
               </div>
             </button>
           ))}
-          {filteredAnalytics.length === 0 ? <p className="empty-state">No exercises match that filter yet.</p> : null}
+          {filteredAnalytics.length === 0 ? <p className="empty-state">No matches.</p> : null}
         </div>
       </SectionCard>
 
