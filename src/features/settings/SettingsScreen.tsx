@@ -13,6 +13,7 @@ interface SettingsScreenProps {
   defaultRestSeconds: number
   pendingSyncCount: number
   syncMessage: string | null
+  authMessage: string | null
   onSignIn: (email: string, password: string) => Promise<void>
   onSignUp: (email: string, password: string) => Promise<void>
   onSignOut: () => Promise<void>
@@ -51,6 +52,7 @@ export function SettingsScreen({
   defaultRestSeconds,
   pendingSyncCount,
   syncMessage,
+  authMessage,
   onSignIn,
   onSignUp,
   onSignOut,
@@ -62,6 +64,25 @@ export function SettingsScreen({
 }: SettingsScreenProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [isSubmittingAuth, setIsSubmittingAuth] = useState(false)
+
+  async function handleSignIn() {
+    setIsSubmittingAuth(true)
+    try {
+      await onSignIn(email, password)
+    } finally {
+      setIsSubmittingAuth(false)
+    }
+  }
+
+  async function handleSignUp() {
+    setIsSubmittingAuth(true)
+    try {
+      await onSignUp(email, password)
+    } finally {
+      setIsSubmittingAuth(false)
+    }
+  }
 
   return (
     <div className="stack">
@@ -109,6 +130,7 @@ export function SettingsScreen({
           </div>
         ) : (
           <div className="stack compact">
+            {authMessage ? <p className="info-callout">{authMessage}</p> : null}
             <label className="field-label">
               Email
               <input
@@ -128,10 +150,18 @@ export function SettingsScreen({
               />
             </label>
             <div className="inline-actions">
-              <button className="primary-button" onClick={() => onSignIn(email, password)}>
-                Sign in
+              <button
+                className="primary-button"
+                onClick={() => void handleSignIn()}
+                disabled={isSubmittingAuth}
+              >
+                {isSubmittingAuth ? 'Signing in…' : 'Sign in'}
               </button>
-              <button className="ghost-button" onClick={() => onSignUp(email, password)}>
+              <button
+                className="ghost-button"
+                onClick={() => void handleSignUp()}
+                disabled={isSubmittingAuth}
+              >
                 Create account
               </button>
             </div>

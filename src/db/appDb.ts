@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie'
-import { createSeedExercises } from './seed'
+import { BASELINE_DATA_TIMESTAMP, createSeedExercises } from './seed'
 import type {
   Exercise,
   LoggedSet,
@@ -53,7 +53,7 @@ function createDefaultPreferences(): Preferences {
     weightUnit: 'lb',
     defaultRestSeconds: 120,
     activeTimerEndAt: null,
-    updatedAt: new Date().toISOString(),
+    updatedAt: BASELINE_DATA_TIMESTAMP,
   }
 }
 

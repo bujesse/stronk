@@ -1,5 +1,6 @@
 import type { Exercise } from '../lib/types'
-import { nowIso } from '../lib/time'
+
+export const BASELINE_DATA_TIMESTAMP = '2026-01-01T00:00:00.000Z'
 
 const defaults = [
   ['Bench Press', 'Chest', 'Mid Chest', 'Barbell', 'weight_reps', 150],
@@ -76,21 +77,26 @@ const defaults = [
 ] as const
 
 export function createSeedExercises() {
-  const timestamp = nowIso()
+  const timestamp = BASELINE_DATA_TIMESTAMP
 
-  return defaults.map<Exercise>(([movementName, bodyRegion, muscleGroup, equipment, trackingMode, rest]) => ({
-    id: `exercise_seed_${`${movementName}_${equipment}`.toLowerCase().replaceAll(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')}`,
-    movementName,
-    bodyRegion,
-    muscleGroup,
-    equipment,
-    preferredWeightUnit: null,
-    trackingMode,
-    defaultRestSeconds: rest,
-    isCustom: false,
-    deletedAt: null,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-    syncStatus: 'synced',
-  }))
+  return defaults.map<Exercise>(
+    ([movementName, bodyRegion, muscleGroup, equipment, trackingMode, rest]) => ({
+      id: `exercise_seed_${`${movementName}_${bodyRegion}_${muscleGroup}_${equipment}_${trackingMode}`
+        .toLowerCase()
+        .replaceAll(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')}`,
+      movementName,
+      bodyRegion,
+      muscleGroup,
+      equipment,
+      preferredWeightUnit: null,
+      trackingMode,
+      defaultRestSeconds: rest,
+      isCustom: false,
+      deletedAt: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      syncStatus: 'synced',
+    }),
+  )
 }

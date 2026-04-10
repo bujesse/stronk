@@ -4,6 +4,11 @@ import { getPocketBaseUrl } from '../lib/config'
 
 let cachedClient: PocketBase | null = null
 
+export function resetPocketBaseClient() {
+  cachedClient?.authStore.clear()
+  cachedClient = null
+}
+
 export function isPocketBaseConfigured() {
   return Boolean(getPocketBaseUrl())
 }

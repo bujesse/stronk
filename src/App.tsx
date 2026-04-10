@@ -89,6 +89,7 @@ const routeToTab: Array<{ path: string; id: TabId }> = [
 
 function App() {
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
+  const [authMessage, setAuthMessage] = useState<string | null>(null)
   useTicker(30000, true)
   const location = useLocation()
   const navigate = useNavigate()
@@ -227,6 +228,9 @@ function App() {
             history={history}
             analytics={analytics}
             preferences={preferences}
+            onOpenWorkout={(workoutId) => {
+              navigate(`${routes.history.path}/${encodeURIComponent(workoutId)}`)
+            }}
             onStartTemplate={async (templateId) => {
               await startWorkoutFromTemplate(templateId)
               navigate(routes.workout.path)
@@ -373,17 +377,26 @@ function App() {
             defaultRestSeconds={preferences?.defaultRestSeconds ?? 120}
             pendingSyncCount={pendingSyncCount}
             syncMessage={syncMessage}
+            authMessage={authMessage}
             onSignIn={async (email, password) => {
               const result = await signInWithPassword(email, password)
-              setSyncMessage(result.message)
+              setAuthMessage(result.message)
+              if (result.ok) {
+                const syncResult = await runSync()
+                setSyncMessage(syncResult.message)
+              }
             }}
             onSignUp={async (email, password) => {
               const result = await signUpWithPassword(email, password)
-              setSyncMessage(result.message)
+              setAuthMessage(result.message)
+              if (result.ok) {
+                const syncResult = await runSync()
+                setSyncMessage(syncResult.message)
+              }
             }}
             onSignOut={async () => {
               const result = await signOut()
-              setSyncMessage(result.message)
+              setAuthMessage(result.message)
             }}
             onWeightUnitChange={async (unit) => {
               await savePreferences({ weightUnit: unit })

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { WorkoutTimelineGrid } from '../../components/WorkoutTimelineGrid'
 import { SectionCard } from '../../components/SectionCard'
 import { ProgressionModal } from '../history/ProgressionModal'
 import { formatDateTime, formatShortDate } from '../../lib/time'
@@ -12,6 +13,7 @@ interface DashboardScreenProps {
   analytics: ExerciseAnalytics[]
   preferences: Preferences | null
   onStartTemplate: (templateId: string) => void
+  onOpenWorkout: (workoutId: string) => void
 }
 
 export function DashboardScreen({
@@ -21,6 +23,7 @@ export function DashboardScreen({
   analytics,
   preferences,
   onStartTemplate,
+  onOpenWorkout,
 }: DashboardScreenProps) {
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null)
   const recent = history[0]
@@ -86,6 +89,7 @@ export function DashboardScreen({
             <p>{recent ? 'start time' : 'complete a workout'}</p>
           </div>
         </div>
+        <WorkoutTimelineGrid history={history} onOpenWorkout={onOpenWorkout} />
         <div className="stack compact">
           {leaders.map((entry) => (
             <button
